@@ -20,7 +20,20 @@ const howItWorks = [
   {
     step: "1",
     title: "An app asks for a login",
-    body: "Open-source Play Store clients (like Aurora Store) need a Google session to browse and download apps anonymously."
+    body: (
+      <>
+        Open-source Play Store clients (like{" "}
+        <a
+          href="https://github.com/rehmatworks/gplaydl"
+          target="_blank"
+          rel="noreferrer"
+          className="text-aurora-teal hover:underline"
+        >
+          gplaydl
+        </a>
+        ) need a Google session to browse and download apps anonymously.
+      </>
+    )
   },
   {
     step: "2",
@@ -38,12 +51,20 @@ const contributeSteps = [
   {
     icon: UserPlus,
     title: "Create a free account here",
-    body: "Register with any email address — it only takes a moment and is just used to manage your contributions."
+    body: (
+      <>
+        <Link to="/register" className="text-aurora-teal hover:underline">
+          Sign up
+        </Link>{" "}
+        with any email address — it only takes a moment and is just used to manage your
+        contributions.
+      </>
+    )
   },
   {
     icon: ShieldCheck,
     title: "Use a spare Google account",
-    body: "Don't use your personal account. Create a fresh Google account just for this — it needs nothing in it, no payment method, no personal data."
+    body: "Don't use your personal account. Create a fresh Google account just for this — it needs nothing in it, no payment method, no personal data. If you want to download apps you've purchased, you can add your personal account and keep it private — but do so at your own risk, as Google may flag or ban accounts used for token-based logins."
   },
   {
     icon: Smartphone,
@@ -87,7 +108,20 @@ const features = [
   {
     icon: KeyRound,
     title: "Works out of the box",
-    body: "Any Aurora Store-compatible client can use this service at /api/auth — no configuration needed."
+    body: (
+      <>
+        Compatible clients like{" "}
+        <a
+          href="https://github.com/rehmatworks/gplaydl"
+          target="_blank"
+          rel="noreferrer"
+          className="text-aurora-teal hover:underline"
+        >
+          gplaydl
+        </a>{" "}
+        can use this service at /api/auth — no configuration needed.
+      </>
+    )
   }
 ]
 

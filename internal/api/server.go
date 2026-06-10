@@ -42,7 +42,7 @@ func (s *Server) Router() http.Handler {
 	r.Use(middleware.Timeout(2 * time.Minute))
 	r.Use(securityHeaders)
 
-	// Aurora Store compatible dispense endpoints (anonymous or API key).
+	// gplaydl-compatible dispense endpoints (anonymous or API key).
 	r.Group(func(r chi.Router) {
 		r.Use(s.maybeAPIKey)
 		r.Use(s.dispenseRateLimit())

@@ -4,7 +4,7 @@
 
 A small community-run login pool for open-source app store clients. Contributors share
 spare Google accounts (publicly or privately), and the service hands out anonymous
-session tokens to Aurora Store-compatible clients.
+session tokens to compatible clients like [gplaydl](https://github.com/rehmatworks/gplaydl).
 
 ## Features
 

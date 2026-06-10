@@ -1,6 +1,6 @@
 package gplay
 
-// AuthBundle is the response shape Aurora Store clients expect.
+// AuthBundle is the response shape gplaydl-compatible clients expect.
 // Field names intentionally match the original NodeJS dispenser.
 type AuthBundle struct {
 	AASToken                      string             `json:"aasToken"`
