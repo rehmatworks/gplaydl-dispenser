@@ -51,7 +51,7 @@ export function AddAccountDialog({ onAdded }: { onAdded: (account: Account) => v
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Add a Google account</DialogTitle>
           <DialogDescription>
-            Generate an AAS token with the{" "}
+            Use a spare account — not your personal one. Sign in to it with the{" "}
             <a
               href="https://github.com/whyorean/Authenticator/releases"
               target="_blank"
@@ -59,8 +59,9 @@ export function AddAccountDialog({ onAdded }: { onAdded: (account: Account) => v
               className="text-aurora-teal hover:underline"
             >
               Authenticator app
-            </a>
-            . Tokens are encrypted with AES-256-GCM before storage.
+            </a>{" "}
+            and paste the token it shows you. It is encrypted before it is stored, and you can
+            remove it anytime.
           </DialogDescription>
         </DialogHeader>
 

@@ -2,11 +2,9 @@
 
 **Live instance: [dispenser.gplaydl.com](https://dispenser.gplaydl.com)**
 
-A high-concurrency Google Play token dispenser written in Go, with a PostgreSQL-backed
-account pool and a web app for managing shared (public) and private Google accounts.
-
-A community rewrite of [Aurora Dispenser](https://gitlab.com/AuroraOSS/aurora-dispenser)
-— API-compatible with Aurora Store clients.
+A small community-run login pool for open-source app store clients. Contributors share
+spare Google accounts (publicly or privately), and the service hands out anonymous
+session tokens to Aurora Store-compatible clients.
 
 ## Features
 
@@ -19,8 +17,8 @@ A community rewrite of [Aurora Dispenser](https://gitlab.com/AuroraOSS/aurora-di
 - **Encrypted at rest** — AAS tokens are sealed with AES-256-GCM before storage.
 - **Self-healing pool** — accounts are auto-flagged after 5 consecutive failures and
   drop out of rotation; a successful mint reactivates them.
-- **High-concurrency minting** — bounded parallel Google handshakes (default 64),
-  shared connection pool, per-mint timeouts, automatic failover to the next account.
+- **Concurrent minting** — bounded parallel handshakes, per-mint timeouts, and
+  automatic failover to the next account.
 - **Built-in web app** — React + shadcn/ui dashboard embedded in the single Go binary:
   stats, mint timeline chart, account management, API keys.
 - **Rate limiting** — anonymous dispenses are limited per IP; API-key users are exempt.

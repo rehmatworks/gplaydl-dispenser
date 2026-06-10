@@ -43,7 +43,7 @@ export default function Register() {
           <CardHeader className="pb-2 text-center">
             <CardTitle className="font-display text-2xl">Create your account</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Pool Google accounts, mint tokens, help the community
+              Contribute a spare account, or manage your own private pool
             </p>
           </CardHeader>
           <CardContent className="p-6 pt-4">
