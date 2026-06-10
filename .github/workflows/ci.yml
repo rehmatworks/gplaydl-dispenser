@@ -99,9 +99,11 @@ jobs:
           tar -xzf release.tar.gz -C /tmp/ dispenser
           tar -xzf release.tar.gz resources deploy
 
-          # Atomic binary swap, keep one rollback copy
-          if [ -f dispenser ]; then cp dispenser dispenser.previous; fi
+          # Atomic binary swap, keep one rollback copy. mv only needs
+          # directory write permission, so stale root-owned files can't
+          # break the deploy.
           install -m 755 /tmp/dispenser dispenser.new
+          if [ -f dispenser ]; then mv -f dispenser dispenser.previous; fi
           mv -f dispenser.new dispenser
           rm -f /tmp/dispenser release.tar.gz
 

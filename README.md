@@ -99,7 +99,10 @@ protoc --proto_path=proto --go_out=internal/pb --go_opt=paths=source_relative pr
 | `RESOURCES_DIR` | `resources` | Device `.properties` profiles |
 | `DEFAULT_DEVICE` | `arm64_xxhdpi` | Default device profile |
 | `SESSION_TTL_HOURS` | `336` | Web session lifetime |
-| `PUBLIC_URL` | `https://dispenser.gplaydl.com` | Base URL embedded in minted bundles |
+| `PUBLIC_URL` | `https://dispenser.gplaydl.com` | Base URL embedded in minted bundles and email links |
+| `BREVO_API_KEY` | — (optional) | Brevo API key for verification and password-reset emails; empty disables email flows (users auto-verified) |
+| `MAIL_FROM` | `no-reply@gplaydl.com` | Sender address (must be verified in Brevo) |
+| `MAIL_FROM_NAME` | `gplaydl dispenser` | Sender display name |
 
 ## Architecture
 

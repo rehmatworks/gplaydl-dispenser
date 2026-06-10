@@ -5,11 +5,12 @@ import { Logo } from "@/components/Logo"
 import { MintChart } from "@/components/MintChart"
 import { StatsCards } from "@/components/StatsCards"
 import { Button } from "@/components/ui/button"
-import { api, type Account, type MintBucket, type PoolStats } from "@/lib/api"
+import { api, ApiError, type Account, type MintBucket, type PoolStats } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
-import { LogOut } from "lucide-react"
+import { LogOut, MailWarning } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 
 export default function Dashboard() {
   const { user, setUser } = useAuth()
@@ -30,6 +31,20 @@ export default function Dashboard() {
     const interval = setInterval(refresh, 30_000)
     return () => clearInterval(interval)
   }, [refresh])
+
+  const [resending, setResending] = useState(false)
+
+  async function resendVerification() {
+    setResending(true)
+    try {
+      await api.resendVerification()
+      toast.success("Verification email sent — check your inbox")
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not send email")
+    } finally {
+      setResending(false)
+    }
+  }
 
   async function logout() {
     await api.logout().catch(() => {})
@@ -55,6 +70,25 @@ export default function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-8 px-6 py-10">
+        {user && !user.emailVerified && (
+          <div className="animate-fade-up glass flex flex-wrap items-center gap-3 rounded-2xl border border-aurora-teal/30 px-5 py-4">
+            <MailWarning className="size-5 shrink-0 text-aurora-teal" />
+            <p className="flex-1 text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Verify your email</span> to start
+              adding accounts. We sent a link to {user.email}.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={resendVerification}
+              disabled={resending}
+              className="rounded-xl"
+            >
+              {resending ? "Sending…" : "Resend email"}
+            </Button>
+          </div>
+        )}
+
         <div className="animate-fade-up flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Your account pool</h1>

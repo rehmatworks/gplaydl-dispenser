@@ -24,6 +24,9 @@ export default function Register() {
       setUser(res.user)
       // Shown once on the dashboard; the server only stores a hash.
       sessionStorage.setItem("freshApiKey", res.apiKey)
+      if (!res.user.emailVerified) {
+        toast.success("Welcome! Check your inbox to verify your email.")
+      }
       navigate("/dashboard")
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Could not create account")

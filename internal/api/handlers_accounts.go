@@ -32,6 +32,10 @@ type createAccountRequest struct {
 
 func (s *Server) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 	user := userFrom(r.Context())
+	if !user.EmailVerified {
+		writeError(w, http.StatusForbidden, "please verify your email before adding accounts")
+		return
+	}
 
 	var req createAccountRequest
 	if !readJSON(w, r, &req) {

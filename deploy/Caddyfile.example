@@ -3,6 +3,12 @@
 dispenser.gplaydl.com {
 	encode zstd gzip
 
+	# Static downloads (e.g. the Authenticator APK), served straight from disk.
+	handle_path /downloads/* {
+		root * /var/www/downloads
+		file_server
+	}
+
 	reverse_proxy localhost:8080 {
 		# The app trusts X-Forwarded-For / X-Real-IP for rate limiting.
 		header_up X-Real-IP {remote_host}

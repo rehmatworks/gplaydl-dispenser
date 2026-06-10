@@ -51,16 +51,21 @@ export function AddAccountDialog({ onAdded }: { onAdded: (account: Account) => v
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Add a Google account</DialogTitle>
           <DialogDescription>
-            Use a spare account — not your personal one. Sign in to it with the{" "}
+            Use a spare account — not your personal one. Sign in to it with the Authenticator app
+            (
+            <a href="/downloads/Authenticator_v1.0.4.apk" className="text-aurora-teal hover:underline">
+              download APK
+            </a>
+            ,{" "}
             <a
-              href="https://github.com/whyorean/Authenticator/releases"
+              href="https://github.com/whyorean/Authenticator"
               target="_blank"
               rel="noreferrer"
               className="text-aurora-teal hover:underline"
             >
-              Authenticator app
-            </a>{" "}
-            and paste the token it shows you. It is encrypted before it is stored, and you can
+              source on GitHub
+            </a>
+            ) and paste the token it shows you. It is encrypted before it is stored, and you can
             remove it anytime.
           </DialogDescription>
         </DialogHeader>

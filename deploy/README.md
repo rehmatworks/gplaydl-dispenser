@@ -40,6 +40,9 @@ MINT_CONCURRENCY=64
 RESOURCES_DIR=/opt/gplaydl-dispenser/resources
 DEFAULT_DEVICE=arm64_xxhdpi
 PUBLIC_URL=https://dispenser.gplaydl.com
+BREVO_API_KEY=CHANGE-ME
+MAIL_FROM=no-reply@gplaydl.com
+MAIL_FROM_NAME=gplaydl dispenser
 EOF
 sudo chmod 600 /etc/gplaydl-dispenser/env
 ```

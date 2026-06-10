@@ -227,18 +227,25 @@ export default function Landing() {
           <div className="glass mt-8 rounded-2xl p-6">
             <p className="text-sm leading-relaxed text-muted-foreground">
               <span className="font-semibold text-foreground">Where do I get the token?</span>{" "}
-              Download the free, open-source{" "}
+              Install the free, open-source Authenticator app on any Android device —{" "}
               <a
-                href="https://github.com/whyorean/Authenticator/releases"
+                href="/downloads/Authenticator_v1.0.4.apk"
+                className="text-aurora-teal hover:underline"
+              >
+                download the APK here
+              </a>{" "}
+              (source code on{" "}
+              <a
+                href="https://github.com/whyorean/Authenticator"
                 target="_blank"
                 rel="noreferrer"
                 className="text-aurora-teal hover:underline"
               >
-                Authenticator app
-              </a>{" "}
-              on any Android device, sign in with the spare account, and it shows you the token to
-              copy. The token keeps working until you change the account's password — which is
-              also how you revoke it for good.
+                GitHub
+              </a>
+              ) — then sign in with the spare account and it shows you the token to copy. The
+              token keeps working until you change the account's password — which is also how you
+              revoke it for good.
             </p>
           </div>
 

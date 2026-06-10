@@ -14,6 +14,7 @@ import (
 	"gplaydl-dispenser/internal/config"
 	"gplaydl-dispenser/internal/crypto"
 	"gplaydl-dispenser/internal/gplay"
+	"gplaydl-dispenser/internal/mail"
 	"gplaydl-dispenser/internal/store"
 	"gplaydl-dispenser/web"
 )
@@ -45,7 +46,12 @@ func main() {
 
 	gp := gplay.NewClient(cfg.MintConcurrency, cfg.MintTimeout, cfg.PublicURL+"/api/auth")
 
-	server := api.NewServer(cfg, st, box, gp, web.Dist(), log)
+	mailer := mail.New(cfg.BrevoAPIKey, cfg.MailFrom, cfg.MailFromName, cfg.PublicURL, log)
+	if !mailer.Enabled() {
+		log.Warn("BREVO_API_KEY not set: email verification and password reset are disabled; new users are auto-verified")
+	}
+
+	server := api.NewServer(cfg, st, box, gp, mailer, web.Dist(), log)
 
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,

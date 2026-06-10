@@ -1,6 +1,7 @@
 export interface User {
   id: string
   email: string
+  emailVerified: boolean
   createdAt: string
 }
 
@@ -74,6 +75,27 @@ export const api = {
     }),
 
   logout: () => request<{ status: string }>("/api/v1/logout", { method: "POST" }),
+
+  verifyEmail: (token: string) =>
+    request<{ status: string }>("/api/v1/verify-email", {
+      method: "POST",
+      body: JSON.stringify({ token })
+    }),
+
+  resendVerification: () =>
+    request<{ status: string }>("/api/v1/resend-verification", { method: "POST" }),
+
+  forgotPassword: (email: string) =>
+    request<{ status: string }>("/api/v1/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email })
+    }),
+
+  resetPassword: (token: string, password: string) =>
+    request<{ status: string }>("/api/v1/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, password })
+    }),
 
   me: () => request<{ user: User }>("/api/v1/me"),
 
