@@ -1,0 +1,29 @@
+[Unit]
+Description=gplaydl dispenser - Google Play token dispenser
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dispenser
+Group=dispenser
+WorkingDirectory=/opt/gplaydl-dispenser
+ExecStart=/opt/gplaydl-dispenser/dispenser
+EnvironmentFile=/etc/gplaydl-dispenser/env
+Restart=always
+RestartSec=3
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/gplaydl-dispenser
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+MemoryDenyWriteExecute=true
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

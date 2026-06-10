@@ -1,0 +1,37 @@
+# --- Secrets / local config ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Go build artifacts ---
+/dispenser
+/dispenser-*
+*.exe
+*.test
+*.out
+/coverage*
+
+# --- Frontend ---
+node_modules/
+# Built frontend is embedded at build time, never committed.
+# Keep only the placeholder index.html so `go build` works on fresh clones.
+web/dist/*
+!web/dist/index.html
+web/.vite/
+web/*.tsbuildinfo
+
+# --- Runtime data ---
+*.log
+logs/
+accounts.txt
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json

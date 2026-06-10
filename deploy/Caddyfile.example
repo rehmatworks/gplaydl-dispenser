@@ -1,0 +1,10 @@
+# Add to /etc/caddy/Caddyfile, then: sudo systemctl reload caddy
+
+dispenser.gplaydl.com {
+	encode zstd gzip
+
+	reverse_proxy localhost:8080 {
+		# The app trusts X-Forwarded-For / X-Real-IP for rate limiting.
+		header_up X-Real-IP {remote_host}
+	}
+}

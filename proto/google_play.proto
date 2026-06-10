@@ -1,0 +1,298 @@
+/*
+ * SPDX-FileCopyrightText: 2024 Aurora OSS
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+
+/*
+  $ npm run compile-proto
+*/
+
+syntax = "proto2";
+package GooglePlay;
+
+option go_package = "gplaydl-dispenser/internal/pb";
+
+message DeviceConfigurationProto {
+  optional int32 touchScreen = 1;
+  optional int32 keyboard = 2;
+  optional int32 navigation = 3;
+  optional int32 screenLayout = 4;
+  optional bool hasHardKeyboard = 5;
+  optional bool hasFiveWayNavigation = 6;
+  optional int32 screenDensity = 7;
+  optional int32 glEsVersion = 8;
+  repeated string systemSharedLibrary = 9;
+  repeated string systemAvailableFeature = 10;
+  repeated string nativePlatform = 11;
+  optional int32 screenWidth = 12;
+  optional int32 screenHeight = 13;
+  repeated string systemSupportedLocale = 14;
+  repeated string glExtension = 15;
+  optional int32 deviceClass = 16;
+  optional int32 maxApkDownloadSizeMb = 17[default = 50];
+  optional int32 smallestScreenWidthDP = 18;
+  optional int32 lowRamDevice = 19[default = 0];
+  optional int64 totalMemoryBytes = 20[default = 8354971648];
+  optional int32 maxNumOf_CPUCores = 21[default = 8];
+  repeated DeviceFeature deviceFeature = 26;
+  optional int32 unknown28 = 28[default = 0];
+  optional int32 unknown30 = 30[default = 4];
+}
+
+message DeviceFeature{
+  optional string name = 1;
+  optional int32 value = 2;
+}
+
+message CorpusMetadata {
+  optional int32 backend = 1;
+  optional string name = 2;
+  optional string landingUrl = 3;
+  optional string libraryName = 4;
+  optional string recsWidgetUrl = 6;
+  optional string shopName = 7;
+}
+
+message Experiments {
+  repeated string experimentId = 1;
+}
+
+message SelfUpdateConfig {
+  optional int32 latestClientVersionCode = 1;
+}
+
+message TocResponse {
+  repeated CorpusMetadata corpus = 1;
+  optional int32 tosVersionDeprecated = 2;
+  optional string tosContent = 3;
+  optional string homeUrl = 4;
+  optional Experiments experiments = 5;
+  optional string tosCheckboxTextMarketingEmails = 6;
+  optional string tosToken = 7;
+  optional UserSettings userSettings = 8;
+  optional string iconOverrideUrl = 9;
+  optional SelfUpdateConfig selfUpdateConfig = 10;
+  optional bool requiresUploadDeviceConfig = 11;
+  optional string recsWidgetUrl = 13;
+  optional string socialHomeUrl = 15;
+  optional bool ageVerificationRequired = 16;
+  optional bool gPlusSignupEnabled = 17;
+  optional bool redeemEnabled = 18;
+  optional string helpUrl = 19;
+  optional int32 themeId = 20;
+  optional string entertainmentHomeUrl = 21;
+  optional string cookie = 22;
+}
+
+message UserSettings {
+  optional bool tosCheckboxMarketingEmailsOptedIn = 1;
+  optional PrivacySetting privacySetting = 2;
+}
+
+message PrivacySetting {
+  optional int32 type = 1;
+  optional int32 currentStatus = 2;
+  optional bool enabledByDefault = 3;
+}
+
+message Payload {
+  optional TocResponse tocResponse = 6;
+  optional AcceptTosResponse acceptTosResponse = 22;
+  optional AndroidCheckinResponse androidCheckinResponse = 26;
+  optional UploadDeviceConfigResponse uploadDeviceConfigResponse = 28;
+}
+
+message AcceptTosResponse {
+}
+
+message PreFetch {
+  optional string url = 1;
+  optional ResponseWrapper response = 2;
+  optional string etag = 3;
+  optional int64 ttl = 4;
+  optional int64 softTtl = 5;
+}
+
+message ServerMetadata {
+  optional int64 latencyMillis = 1;
+}
+
+message Targets {
+  repeated int64 targetId = 1;
+  optional bytes signature = 2;
+}
+
+message ServerCookie {
+  optional int32 type = 1;
+  optional bytes token = 2;
+}
+
+message ServerCookies {
+  repeated ServerCookie serverCookie = 1;
+}
+
+message ResponseWrapper {
+  optional Payload payload = 1;
+  repeated PreFetch preFetch = 3;
+  optional bytes serverLogsCookie = 9;
+}
+
+message ResponseWrapperApi {
+  optional PayloadApi payload = 1;
+}
+
+message PayloadApi {
+  optional UserProfileResponse userProfileResponse = 5;
+}
+
+message UserProfileResponse {
+  optional UserProfile userProfile = 1;
+}
+
+message Image {
+  optional int32 imageType = 1;
+  optional group Dimension = 2 {
+    optional int32 width = 3;
+    optional int32 height = 4;
+    optional int32 aspectRatio = 18;
+  }
+  optional string imageUrl = 5;
+  optional string altTextLocalized = 6;
+  optional string secureUrl = 7;
+  optional int32 positionInSequence = 8;
+  optional bool supportsFifeUrlOptions = 9;
+  optional group Citation = 10 {
+    optional string titleLocalized = 11;
+    optional string url = 12;
+  }
+  optional int32 durationSeconds = 14;
+  optional string fillColorRGB = 15;
+  optional bool autogen = 16;
+  optional string backgroundColorRgb = 19;
+  optional int32 deviceClass = 21;
+  optional bool supportsFifeMonogramOption = 22;
+  optional string imageUrlAlt = 28;
+}
+
+message UserProfile {
+  optional string profileId = 1;
+  optional string personId = 2;
+  optional int32 profileType = 3;
+  optional int32 personType = 4;
+  optional string name = 5;
+  repeated Image image = 10;
+  optional string profileUrl = 19;
+  optional string profileDescription = 22;
+}
+
+message UploadDeviceConfigRequest {
+  optional DeviceConfigurationProto deviceConfiguration = 1;
+  optional string manufacturer = 2;
+  optional string gcmRegistrationId = 3;
+}
+
+message UploadDeviceConfigResponse {
+  optional string uploadDeviceConfigToken = 1;
+}
+
+message AndroidCheckinRequest {
+  optional string imei = 1;
+  optional int64 id = 2[default = 0];
+  optional string digest = 3;
+  optional AndroidCheckinProto checkin = 4;
+  optional string desiredBuild = 5;
+  optional string locale = 6;
+  optional int64 loggingId = 7;
+  optional string marketCheckin = 8;
+  repeated string macAddr = 9;
+  optional string meid = 10;
+  repeated string accountCookie = 11;
+  optional string timeZone = 12;
+  optional fixed64 securityToken = 13;
+  optional int32 version = 14;
+  repeated string otaCert = 15;
+  optional string serialNumber = 16;
+  optional string esn = 17;
+  optional DeviceConfigurationProto deviceConfiguration = 18;
+  repeated string macAddrType = 19;
+  optional int32 fragment = 20;
+  optional string userName = 21;
+  optional int32 userSerialNumber = 22;
+}
+
+message AndroidIntentProto {
+  optional string action = 1;
+  optional string dataUri = 2;
+  optional string mimeType = 3;
+  optional string javaClass = 4;
+  repeated group Extra = 5 {
+    optional string name = 6;
+    optional string value = 7;
+  }
+}
+
+message AndroidCheckinResponse {
+  optional bool status = 1;
+  repeated AndroidIntentProto intent = 2;
+  optional int64 timeMsec = 3;
+  optional string digest = 4;
+  repeated GoogleServicesSetting setting = 5;
+  optional bool marketOk = 6;
+  optional fixed64 androidId = 7;
+  optional fixed64 securityToken = 8;
+  optional bool settingsDiff = 9;
+  repeated string deleteSetting = 10;
+  optional string deviceCheckinConsistencyToken = 12;
+}
+
+message AndroidEventProto {
+  optional string tag = 1;
+  optional string value = 2;
+  optional int64 timeMsec = 3;
+}
+
+message AndroidStatisticProto {
+  optional string tag = 1;
+  optional int32 count = 2;
+  optional float sum = 3;
+}
+
+message GoogleServicesSetting {
+  optional bytes name = 1;
+  optional bytes value = 2;
+}
+
+message AndroidBuildProto {
+  optional string id = 1;
+  optional string product = 2;
+  optional string carrier = 3;
+  optional string radio = 4;
+  optional string bootloader = 5;
+  optional string client = 6;
+  optional int64 timestamp = 7;
+  optional int32 googleServices = 8;
+  optional string device = 9;
+  optional int32 sdkVersion = 10;
+  optional string model = 11;
+  optional string manufacturer = 12;
+  optional string buildProduct = 13;
+  optional bool otaInstalled = 14;
+}
+
+message AndroidCheckinProto {
+  optional AndroidBuildProto build = 1;
+  optional int64 lastCheckinMsec = 2;
+  repeated AndroidEventProto event = 3;
+  repeated AndroidStatisticProto stat = 4;
+  repeated string requestedGroup = 5;
+  optional string cellOperator = 6;
+  optional string simOperator = 7;
+  optional string roaming = 8;
+  optional int32 userNumber = 9;
+}
+
+message PackageInfo {
+  optional string pkgName = 1;
+  optional int32 versionCode = 2;
+}

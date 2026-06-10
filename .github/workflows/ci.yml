@@ -1,0 +1,128 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  GO_VERSION: "1.26"
+  NODE_VERSION: "22"
+
+jobs:
+  build:
+    name: Build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Vet & test
+        run: |
+          go vet ./...
+          go test ./...
+
+      # The frontend built above is embedded into the binary via go:embed.
+      - name: Build linux binary
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go build -trimpath -ldflags="-s -w" -o dispenser ./cmd/dispenser
+
+      - name: Package release
+        run: tar -czf release.tar.gz dispenser resources deploy
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release.tar.gz
+          retention-days: 7
+
+  deploy:
+    name: Deploy to production
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<EOF
+          Host production
+            HostName ${{ secrets.DEPLOY_HOST }}
+            User ${{ secrets.DEPLOY_USER }}
+            Port ${{ secrets.DEPLOY_PORT || '22' }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking yes
+          EOF
+
+      - name: Upload release
+        run: scp release.tar.gz production:/opt/gplaydl-dispenser/release.tar.gz
+
+      - name: Install & restart
+        run: |
+          ssh production <<'EOF'
+          set -euo pipefail
+          cd /opt/gplaydl-dispenser
+
+          tar -xzf release.tar.gz -C /tmp/ dispenser
+          tar -xzf release.tar.gz resources deploy
+
+          # Atomic binary swap, keep one rollback copy
+          if [ -f dispenser ]; then cp dispenser dispenser.previous; fi
+          install -m 755 /tmp/dispenser dispenser.new
+          mv -f dispenser.new dispenser
+          rm -f /tmp/dispenser release.tar.gz
+
+          sudo /usr/bin/systemctl restart gplaydl-dispenser
+          EOF
+
+      - name: Health check
+        run: |
+          ssh production '
+            for i in $(seq 1 15); do
+              if curl -fsS http://localhost:8080/api/health > /dev/null; then
+                echo "Service is healthy."
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "Health check failed — rolling back." >&2
+            cd /opt/gplaydl-dispenser
+            if [ -f dispenser.previous ]; then
+              mv -f dispenser.previous dispenser
+              sudo /usr/bin/systemctl restart gplaydl-dispenser
+            fi
+            exit 1
+          '
