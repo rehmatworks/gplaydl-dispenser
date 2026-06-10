@@ -48,7 +48,18 @@ const contributeSteps = [
   {
     icon: Smartphone,
     title: "Generate a token",
-    body: "Sign in to the spare account in the Authenticator app and copy the token it gives you (it starts with aas_et/). That token is what you contribute — not your password."
+    body: (
+      <>
+        <a
+          href="/downloads/Authenticator_v1.0.4.apk"
+          className="text-aurora-teal hover:underline"
+        >
+          Download the Authenticator app
+        </a>{" "}
+        on any Android device, sign in to the spare account, and copy the token it gives you (it
+        starts with aas_et/). That token is what you contribute — not your password.
+      </>
+    )
   },
   {
     icon: HeartHandshake,
