@@ -119,6 +119,14 @@ export function AccountsTable({ accounts, onChange, onDelete }: Props) {
             <TableRow key={account.id} className="border-border">
               <TableCell className="pl-5">
                 <span className="mono-chip">{account.email}</span>
+                {account.source === "app" && (
+                  <span
+                    className="ml-2 text-xs text-muted-foreground"
+                    title="Synced from the Authenticator app"
+                  >
+                    via app
+                  </span>
+                )}
                 {account.failureCount > 0 && (
                   <span className="ml-2 text-xs text-chart-4">
                     {account.failureCount} fails

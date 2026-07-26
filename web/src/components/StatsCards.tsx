@@ -19,7 +19,7 @@ export function StatsCards({ stats }: { stats: PoolStats | null }) {
       icon: Globe2,
       label: "Public pool",
       value: stats?.publicAccounts ?? "—",
-      sub: "community accounts"
+      sub: stats ? `${stats.sharedAccounts} shared by you` : ""
     },
     {
       icon: KeyRound,

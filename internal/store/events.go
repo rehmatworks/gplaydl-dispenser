@@ -30,6 +30,10 @@ type PoolStats struct {
 	Mints24h        int64 `json:"mints24h"`
 	Failures24h     int64 `json:"failures24h"`
 	TotalMints      int64 `json:"totalMints"`
+	// Contributors counts the distinct owners keeping the community pool alive.
+	Contributors int64 `json:"contributors"`
+	// SharedAccounts is the caller's own contribution to the public pool.
+	SharedAccounts int64 `json:"sharedAccounts"`
 }
 
 // Stats returns pool-wide numbers; when ownerID is non-empty the account
@@ -47,10 +51,14 @@ func (s *Store) Stats(ctx context.Context, ownerID string) (*PoolStats, error) {
 				AND ($1 = '' OR owner_id = $1::uuid)),
 			(SELECT count(*) FROM mint_events WHERE success AND created_at > now() - interval '24 hours'),
 			(SELECT count(*) FROM mint_events WHERE NOT success AND created_at > now() - interval '24 hours'),
-			(SELECT coalesce(sum(mint_count), 0) FROM accounts)`,
+			(SELECT coalesce(sum(mint_count), 0) FROM accounts),
+			(SELECT count(DISTINCT owner_id) FROM accounts WHERE visibility = 'public'),
+			(SELECT count(*) FROM accounts WHERE visibility = 'public'
+				AND ($1 = '' OR owner_id = $1::uuid))`,
 		ownerID,
 	).Scan(&st.PublicAccounts, &st.PrivateAccounts, &st.ActiveAccounts,
-		&st.FlaggedAccounts, &st.Mints24h, &st.Failures24h, &st.TotalMints)
+		&st.FlaggedAccounts, &st.Mints24h, &st.Failures24h, &st.TotalMints,
+		&st.Contributors, &st.SharedAccounts)
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,9 @@ export interface User {
   email: string
   emailVerified: boolean
   createdAt: string
+  /** "device" users were enrolled by the Android app and have no password. */
+  kind: "web" | "device"
+  label: string
 }
 
 export interface Account {
@@ -15,6 +18,9 @@ export interface Account {
   failureCount: number
   mintCount: number
   createdAt: string
+  source: "web" | "app"
+  sharedAt: string | null
+  lastSyncedAt: string | null
 }
 
 export interface PoolStats {
@@ -25,12 +31,22 @@ export interface PoolStats {
   mints24h: number
   failures24h: number
   totalMints: number
+  contributors: number
+  sharedAccounts: number
 }
 
 export interface PublicStats {
   publicAccounts: number
   mints24h: number
   totalMints: number
+  contributors: number
+}
+
+export interface AppRelease {
+  version: string
+  versionCode: number
+  url: string
+  sha256: string
 }
 
 export interface MintBucket {
@@ -38,6 +54,9 @@ export interface MintBucket {
   success: number
   failures: number
 }
+
+/** Must match CONSENT_VERSION in the Android app and the wording on this site. */
+export const CONSENT_VERSION = "2026-07-27"
 
 export class ApiError extends Error {
   status: number
@@ -106,7 +125,9 @@ export const api = {
   addAccount: (email: string, aasToken: string, visibility: "public" | "private") =>
     request<{ account: Account }>("/api/v1/accounts", {
       method: "POST",
-      body: JSON.stringify({ email, aasToken, visibility })
+      // Sharing publicly is only accepted alongside the consent wording the
+      // contributor agreed to; the dialog shows the same text.
+      body: JSON.stringify({ email, aasToken, visibility, consentVersion: CONSENT_VERSION })
     }),
 
   updateAccount: (id: string, patch: { visibility?: string; status?: string }) =>
@@ -128,5 +149,14 @@ export const api = {
 
   publicStats: () => request<PublicStats>("/api/v1/public-stats"),
 
-  timeline: () => request<{ timeline: MintBucket[] }>("/api/v1/timeline")
+  timeline: () => request<{ timeline: MintBucket[] }>("/api/v1/timeline"),
+
+  appLatest: () => request<AppRelease>("/api/v1/app/latest"),
+
+  /** Trades a code shown by the Android app for a browser session. */
+  claimPairing: (code: string) =>
+    request<{ user: User }>("/api/v1/pair/claim", {
+      method: "POST",
+      body: JSON.stringify({ code })
+    })
 }

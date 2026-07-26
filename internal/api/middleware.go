@@ -45,10 +45,7 @@ func (s *Server) requireSession(next http.Handler) http.Handler {
 // param) is present; anonymous requests pass through untouched.
 func (s *Server) maybeAPIKey(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := r.Header.Get("X-Api-Key")
-		if key == "" {
-			key = r.URL.Query().Get("api_key")
-		}
+		key := apiKeyFrom(r)
 		if key != "" {
 			user, err := s.store.UserByAPIKeyHash(r.Context(), crypto.HashToken(key))
 			if err != nil {
@@ -59,6 +56,36 @@ func (s *Server) maybeAPIKey(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// requireUser accepts either a browser session or an API key, so the Android
+// app and the dashboard drive the same account endpoints.
+func (s *Server) requireUser(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if key := apiKeyFrom(r); key != "" {
+			user, err := s.store.UserByAPIKeyHash(r.Context(), crypto.HashToken(key))
+			if err != nil {
+				writeError(w, http.StatusUnauthorized, "invalid API key")
+				return
+			}
+			// Apps poll these endpoints, which doubles as a liveness signal.
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				_ = s.store.TouchUser(ctx, user.ID)
+			}()
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userKey, user)))
+			return
+		}
+		s.requireSession(next).ServeHTTP(w, r)
+	})
+}
+
+func apiKeyFrom(r *http.Request) string {
+	if key := r.Header.Get("X-Api-Key"); key != "" {
+		return key
+	}
+	return r.URL.Query().Get("api_key")
 }
 
 // ipLimiter is a self-pruning per-IP token bucket map.
@@ -129,10 +156,18 @@ func clientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
-// dispenseRateLimit mirrors the original dispenser: ~5 anonymous mints per
-// 10 minutes per IP. Users presenting a valid API key are exempt.
+// dispenseRateLimit allows a burst of 15 anonymous mints and then one per
+// minute per IP. The burst matters because gplaydl rotates through several
+// device profiles in a single run, and a shared NAT can put a whole household
+// behind one address. Users presenting a valid API key are exempt.
 func (s *Server) dispenseRateLimit() func(http.Handler) http.Handler {
-	return limitMiddleware(newIPLimiter(rate.Every(2*time.Minute), 5), true)
+	return limitMiddleware(newIPLimiter(rate.Every(time.Minute), 15), true)
+}
+
+// enrollRateLimit keeps device enrolment cheap for real installs but useless
+// for someone trying to farm identities.
+func (s *Server) enrollRateLimit() func(http.Handler) http.Handler {
+	return limitMiddleware(newIPLimiter(rate.Every(time.Minute), 10), false)
 }
 
 // authRateLimit guards credential endpoints against brute force.

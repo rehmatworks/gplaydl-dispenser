@@ -23,6 +23,13 @@ type Config struct {
 	MailFrom        string
 	MailFromName    string
 	Dev             bool // relaxes cookie security for local development
+
+	// Android app release metadata, served to the app's update check and to the
+	// website download button.
+	AppVersion     string
+	AppVersionCode int
+	AppDownloadURL string
+	AppSHA256      string
 }
 
 func env(key, fallback string) string {
@@ -65,6 +72,14 @@ func Load() (*Config, error) {
 		MailFrom:        env("MAIL_FROM", "no-reply@gplaydl.com"),
 		MailFromName:    env("MAIL_FROM_NAME", "gplaydl dispenser"),
 		Dev:             os.Getenv("DISPENSER_DEV") == "1",
+
+		AppVersion:     env("APP_VERSION", "1.0.0"),
+		AppVersionCode: envInt("APP_VERSION_CODE", 1),
+		AppSHA256:      os.Getenv("APP_SHA256"),
 	}
+
+	cfg.AppDownloadURL = env("APP_DOWNLOAD_URL",
+		cfg.PublicURL+"/downloads/gplaydl-authenticator-latest.apk")
+
 	return cfg, nil
 }

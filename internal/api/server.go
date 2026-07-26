@@ -61,14 +61,28 @@ func (s *Server) Router() http.Handler {
 			r.Post("/verify-email", s.handleVerifyEmail)
 			r.Post("/forgot-password", s.handleForgotPassword)
 			r.Post("/reset-password", s.handleResetPassword)
+			r.Post("/pair/claim", s.handleClaimPairingCode)
 		})
 
+		// The Android app enrols itself here: no signup, no password.
+		r.Group(func(r chi.Router) {
+			r.Use(s.enrollRateLimit())
+			r.Post("/devices/enroll", s.handleEnrollDevice)
+		})
+
+		// Session-only: things that belong to a browser.
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireSession)
 			r.Post("/logout", s.handleLogout)
-			r.Get("/me", s.handleMe)
 			r.Post("/me/api-key", s.handleRotateAPIKey)
 			r.Post("/resend-verification", s.handleResendVerification)
+		})
+
+		// Shared by the dashboard (session cookie) and the app (API key).
+		r.Group(func(r chi.Router) {
+			r.Use(s.requireUser)
+			r.Get("/me", s.handleMe)
+			r.Post("/pair", s.handlePairingCode)
 
 			r.Get("/accounts", s.handleListAccounts)
 			r.Post("/accounts", s.handleCreateAccount)
@@ -81,10 +95,11 @@ func (s *Server) Router() http.Handler {
 			r.Get("/devices", s.handleDevices)
 		})
 
-		// Public landing-page stats (no auth, modest rate limit).
+		// Public: landing-page stats and the app release pointer.
 		r.Group(func(r chi.Router) {
 			r.Use(s.authRateLimit())
 			r.Get("/public-stats", s.handlePublicStats)
+			r.Get("/app/latest", s.handleAppLatest)
 		})
 	})
 

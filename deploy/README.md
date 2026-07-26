@@ -50,6 +50,38 @@ sudo chmod 600 /etc/gplaydl-dispenser/env
 Back up `DISPENSER_ENCRYPTION_KEY` — losing it makes all stored AAS tokens
 unrecoverable.
 
+## 3b. Android app release metadata
+
+`GET /api/v1/app/latest` drives both the website's download button and the
+in-app update check. Point it at whatever is currently published:
+
+```bash
+APP_VERSION=1.0.0
+APP_VERSION_CODE=1
+APP_SHA256=<sha256 of the published apk>
+APP_DOWNLOAD_URL=https://dispenser.gplaydl.com/downloads/gplaydl-authenticator-latest.apk
+```
+
+Publishing a new APK build is two commands plus an env bump:
+
+```bash
+scp app-release.apk root@server:/tmp/gplaydl-authenticator-<version>.apk
+ssh root@server '
+  install -o caddy -g caddy -m 644 /tmp/gplaydl-authenticator-<version>.apk \
+    /var/www/downloads/gplaydl-authenticator-<version>.apk
+  ln -sf gplaydl-authenticator-<version>.apk \
+    /var/www/downloads/gplaydl-authenticator-latest.apk'
+```
+
+Then update `APP_VERSION`, `APP_VERSION_CODE` and `APP_SHA256` in
+`/etc/gplaydl-dispenser/env` and restart the service. Keep old versioned files
+around so devices that already have a download link do not 404.
+
+The APK must be signed with the same keystore every time or existing installs
+cannot update in place. The keystore and its `signing.properties` live in the
+`gplaydl-authenticator` project, are gitignored, and need their own backup —
+losing them means every contributor has to uninstall and reinstall.
+
 ## 4. systemd service
 
 ```bash

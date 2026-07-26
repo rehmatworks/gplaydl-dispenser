@@ -51,22 +51,16 @@ export function AddAccountDialog({ onAdded }: { onAdded: (account: Account) => v
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Add a Google account</DialogTitle>
           <DialogDescription>
-            Use a spare account — not your personal one. Sign in to it with the Authenticator app
-            (
-            <a href="/downloads/Authenticator_v1.0.4.apk" className="text-aurora-teal hover:underline">
-              download APK
-            </a>
-            ,{" "}
+            This is the manual route. The{" "}
             <a
-              href="https://github.com/whyorean/Authenticator"
-              target="_blank"
-              rel="noreferrer"
+              href="/downloads/gplaydl-authenticator-latest.apk"
               className="text-aurora-teal hover:underline"
             >
-              source on GitHub
-            </a>
-            ) and paste the token it shows you. It is encrypted before it is stored, and you can
-            remove it anytime.
+              Authenticator app
+            </a>{" "}
+            does all of this for you — sign in and the account syncs here on its own. If you would
+            rather paste a token yourself, use a spare account and drop it in below. It is
+            encrypted before it is stored, and you can remove it anytime.
           </DialogDescription>
         </DialogHeader>
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"gplaydl-dispenser/internal/gplay"
@@ -69,25 +70,52 @@ func (s *Server) handleDispenseWithConfig(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, bundle)
 }
 
-var errNoAccounts = fmt.Errorf("no accounts available")
+var (
+	errNoAccounts    = fmt.Errorf("no accounts available")
+	errUnknownEmail  = fmt.Errorf("unknown account email")
+	errEmailNeedsKey = fmt.Errorf("email requires api key")
+)
 
 // dispense claims accounts from the rotation and attempts the handshake,
 // failing over to the next account (up to 3) on credential errors.
+//
+// Pinning to one account with ?email= is how a contributor reaches their own
+// purchased apps; everything else rotates least-recently-used.
 func (s *Server) dispense(r *http.Request, dc gplay.DeviceConfig, locale string) (*gplay.AuthBundle, error) {
 	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.MintTimeout)
 	defer cancel()
 
 	user := userFrom(r.Context())
+	email := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("email")))
 	ownerID := ""
 	includePublic := true
 	if user != nil {
 		ownerID = user.ID
 		includePublic = queryDefault(r, "pool", "any") != "private"
+	} else if email != "" {
+		// Without a key we cannot tell whose account this is, and the community
+		// pool is not a place to look up other people's addresses.
+		return nil, errEmailNeedsKey
+	}
+
+	attempts := 3
+	if email != "" {
+		// A pinned account has no alternative to fail over to.
+		attempts = 1
 	}
 
 	var lastErr error
-	for attempt := 0; attempt < 3; attempt++ {
-		account, err := s.store.NextAccount(ctx, ownerID, includePublic)
+	for attempt := 0; attempt < attempts; attempt++ {
+		var account *store.Account
+		var err error
+		if email != "" {
+			account, err = s.store.NextAccountForEmail(ctx, ownerID, email)
+			if err != nil {
+				return nil, errUnknownEmail
+			}
+		} else {
+			account, err = s.store.NextAccount(ctx, ownerID, includePublic)
+		}
 		if err != nil {
 			if lastErr != nil {
 				return nil, lastErr
@@ -143,11 +171,19 @@ func (s *Server) dispense(r *http.Request, dc gplay.DeviceConfig, locale string)
 }
 
 func (s *Server) dispenseError(w http.ResponseWriter, err error) {
-	if err == errNoAccounts {
-		writeError(w, http.StatusServiceUnavailable, "no accounts available in the pool")
-		return
+	switch err {
+	case errNoAccounts:
+		writeError(w, http.StatusServiceUnavailable,
+			"the community pool is empty right now — share an account with the gplaydl Authenticator app to help out")
+	case errUnknownEmail:
+		writeError(w, http.StatusNotFound,
+			"that email is not one of your registered accounts")
+	case errEmailNeedsKey:
+		writeError(w, http.StatusUnauthorized,
+			"selecting an account by email requires your API key (add ?api_key=... to the dispenser URL)")
+	default:
+		writeError(w, http.StatusBadGateway, err.Error())
 	}
-	writeError(w, http.StatusInternalServerError, err.Error())
 }
 
 // --- Stats ---
@@ -172,6 +208,7 @@ func (s *Server) handlePublicStats(w http.ResponseWriter, r *http.Request) {
 		"publicAccounts": stats.PublicAccounts,
 		"mints24h":       stats.Mints24h,
 		"totalMints":     stats.TotalMints,
+		"contributors":   stats.Contributors,
 	})
 }
 

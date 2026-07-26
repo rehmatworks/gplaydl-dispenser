@@ -16,27 +16,51 @@ type Account struct {
 	FailureCount int        `json:"failureCount"`
 	MintCount    int64      `json:"mintCount"`
 	CreatedAt    time.Time  `json:"createdAt"`
+	Source       string     `json:"source"`
+	SharedAt     *time.Time `json:"sharedAt"`
+	LastSyncedAt *time.Time `json:"lastSyncedAt"`
 }
 
 const accountCols = `id, owner_id, email, aas_token_enc, visibility, status,
-	last_used_at, failure_count, mint_count, created_at`
+	last_used_at, failure_count, mint_count, created_at, source, shared_at, last_synced_at`
 
 func scanAccount(row interface{ Scan(...any) error }) (*Account, error) {
 	a := &Account{}
 	err := row.Scan(&a.ID, &a.OwnerID, &a.Email, &a.AASTokenEnc, &a.Visibility,
-		&a.Status, &a.LastUsedAt, &a.FailureCount, &a.MintCount, &a.CreatedAt)
+		&a.Status, &a.LastUsedAt, &a.FailureCount, &a.MintCount, &a.CreatedAt,
+		&a.Source, &a.SharedAt, &a.LastSyncedAt)
 	if err != nil {
 		return nil, wrapErr(err)
 	}
 	return a, nil
 }
 
-func (s *Store) CreateAccount(ctx context.Context, ownerID, email string, aasTokenEnc []byte, visibility string) (*Account, error) {
+// UpsertAccount stores a Google account for an owner, replacing the token if
+// that owner already registered the same address. The app re-syncs whenever it
+// re-mints, so an insert-only path would reject every refresh.
+func (s *Store) UpsertAccount(ctx context.Context, ownerID, email string, aasTokenEnc []byte, visibility, source, consentVersion string) (*Account, error) {
 	row := s.pool.QueryRow(ctx, `
-		INSERT INTO accounts (owner_id, email, aas_token_enc, visibility)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO accounts (owner_id, email, aas_token_enc, visibility, source,
+		                      consent_version, last_synced_at,
+		                      shared_at)
+		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), now(),
+		        CASE WHEN $4 = 'public' THEN now() END)
+		ON CONFLICT (owner_id, email) DO UPDATE SET
+			aas_token_enc   = EXCLUDED.aas_token_enc,
+			visibility      = EXCLUDED.visibility,
+			source          = EXCLUDED.source,
+			consent_version = COALESCE(EXCLUDED.consent_version, accounts.consent_version),
+			-- a fresh token deserves a clean slate in the rotation
+			status          = CASE WHEN accounts.status = 'disabled' THEN 'disabled' ELSE 'active' END,
+			failure_count   = 0,
+			last_synced_at  = now(),
+			shared_at       = CASE
+				WHEN EXCLUDED.visibility = 'public' THEN COALESCE(accounts.shared_at, now())
+				ELSE NULL
+			END,
+			updated_at      = now()
 		RETURNING `+accountCols,
-		ownerID, email, aasTokenEnc, visibility)
+		ownerID, email, aasTokenEnc, visibility, source, consentVersion)
 	return scanAccount(row)
 }
 
@@ -74,6 +98,10 @@ func (s *Store) UpdateAccount(ctx context.Context, id, ownerID string, visibilit
 			status     = COALESCE($4, status),
 			-- manual re-enable gives the account a clean slate
 			failure_count = CASE WHEN $4 = 'active' THEN 0 ELSE failure_count END,
+			shared_at = CASE
+				WHEN COALESCE($3, visibility) = 'public' THEN COALESCE(shared_at, now())
+				ELSE NULL
+			END,
 			updated_at = now()
 		WHERE id = $1 AND owner_id = $2
 		RETURNING `+accountCols,
@@ -118,6 +146,23 @@ func (s *Store) NextAccount(ctx context.Context, ownerID string, includePublic b
 		)
 		RETURNING `+accountCols,
 		ownerID, includePublic)
+	return scanAccount(row)
+}
+
+// NextAccountForEmail claims one specific account of an owner, identified by
+// its Google address. This is how a contributor downloads their own purchased
+// apps: `?api_key=…&email=me@gmail.com` pins the rotation to that account.
+func (s *Store) NextAccountForEmail(ctx context.Context, ownerID, email string) (*Account, error) {
+	row := s.pool.QueryRow(ctx, `
+		UPDATE accounts SET last_used_at = now(), updated_at = now()
+		WHERE id = (
+			SELECT id FROM accounts
+			WHERE owner_id = $1::uuid AND email = $2 AND status <> 'disabled'
+			LIMIT 1
+			FOR UPDATE
+		)
+		RETURNING `+accountCols,
+		ownerID, email)
 	return scanAccount(row)
 }
 

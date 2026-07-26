@@ -1,11 +1,22 @@
 import { AccountsTable } from "@/components/AccountsTable"
 import { AddAccountDialog } from "@/components/AddAccountDialog"
 import { ApiKeyCard } from "@/components/ApiKeyCard"
+import { CommandBlock } from "@/components/CommandBlock"
+import { DeviceCard } from "@/components/DeviceCard"
 import { Logo } from "@/components/Logo"
 import { MintChart } from "@/components/MintChart"
+import { ShareWithCommunity } from "@/components/ShareWithCommunity"
 import { StatsCards } from "@/components/StatsCards"
 import { Button } from "@/components/ui/button"
-import { api, ApiError, type Account, type MintBucket, type PoolStats } from "@/lib/api"
+import { Card, CardContent } from "@/components/ui/card"
+import {
+  api,
+  ApiError,
+  type Account,
+  type AppRelease,
+  type MintBucket,
+  type PoolStats
+} from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { LogOut, MailWarning } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
@@ -19,6 +30,7 @@ export default function Dashboard() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [stats, setStats] = useState<PoolStats | null>(null)
   const [timeline, setTimeline] = useState<MintBucket[]>([])
+  const [release, setRelease] = useState<AppRelease | null>(null)
 
   const refresh = useCallback(() => {
     api.accounts().then((res) => setAccounts(res.accounts)).catch(() => {})
@@ -28,6 +40,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     refresh()
+    api.appLatest().then(setRelease).catch(() => {})
     const interval = setInterval(refresh, 30_000)
     return () => clearInterval(interval)
   }, [refresh])
@@ -53,6 +66,10 @@ export default function Dashboard() {
     navigate("/")
   }
 
+  const isDevice = user?.kind === "device"
+  const origin = window.location.origin
+  const firstPrivate = accounts.find((a) => a.visibility === "private")
+
   return (
     <div className="min-h-dvh">
       <header className="glass-strong sticky top-0 z-40">
@@ -61,7 +78,9 @@ export default function Dashboard() {
             <Logo />
           </Link>
           <div className="flex items-center gap-4">
-            <span className="hidden text-sm text-muted-foreground sm:block">{user?.email}</span>
+            <span className="hidden text-sm text-muted-foreground sm:block">
+              {isDevice ? user?.label : user?.email}
+            </span>
             <Button variant="ghost" size="sm" onClick={logout} className="rounded-xl">
               <LogOut className="size-4" /> Sign out
             </Button>
@@ -70,7 +89,8 @@ export default function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-8 px-6 py-10">
-        {user && !user.emailVerified && (
+        {/* Device users have no inbox, so the verification nag does not apply. */}
+        {user && !isDevice && !user.emailVerified && (
           <div className="animate-fade-up glass flex flex-wrap items-center gap-3 rounded-2xl border border-aurora-teal/30 px-5 py-4">
             <MailWarning className="size-5 shrink-0 text-aurora-teal" />
             <p className="flex-1 text-sm text-muted-foreground">
@@ -93,19 +113,33 @@ export default function Dashboard() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Your account pool</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Manage Google accounts, sharing, and watch the dispenser at work.
+              {isDevice
+                ? "Manage what your phone shares, and watch the dispenser at work."
+                : "Manage Google accounts, sharing, and watch the dispenser at work."}
             </p>
           </div>
-          <AddAccountDialog
-            onAdded={(account) => {
-              setAccounts((prev) => [account, ...prev])
-              refresh()
-            }}
-          />
+          {!isDevice && (
+            <AddAccountDialog
+              onAdded={(account) => {
+                setAccounts((prev) => [account, ...prev])
+                refresh()
+              }}
+            />
+          )}
         </div>
+
+        {user && isDevice && (
+          <div className="animate-fade-up">
+            <DeviceCard user={user} release={release} />
+          </div>
+        )}
 
         <div className="animate-fade-up [animation-delay:80ms]">
           <StatsCards stats={stats} />
+        </div>
+
+        <div className="animate-fade-up [animation-delay:120ms]">
+          <ShareWithCommunity accounts={accounts} onChanged={refresh} />
         </div>
 
         <div className="animate-fade-up grid gap-5 lg:grid-cols-3 [animation-delay:160ms]">
@@ -133,6 +167,33 @@ export default function Dashboard() {
               refresh()
             }}
           />
+        </section>
+
+        <section className="animate-fade-up space-y-4 [animation-delay:320ms]">
+          <h2 className="font-display text-xl font-semibold">Downloading with gplaydl</h2>
+          <Card className="glass rounded-2xl border-0">
+            <CardContent className="space-y-5 p-6">
+              <CommandBlock
+                label="Community pool — no key needed"
+                command={`gplaydl download com.instagram.android -d ${origin}/api/auth`}
+              />
+              <CommandBlock
+                label={
+                  firstPrivate
+                    ? `Your own account (${firstPrivate.email}) — replace YOUR_KEY with the API key above`
+                    : "One of your own accounts — replace YOUR_KEY and the email"
+                }
+                command={`gplaydl download com.your.app -d "${origin}/api/auth?api_key=YOUR_KEY&email=${
+                  firstPrivate?.email ?? "you@gmail.com"
+                }"`}
+              />
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Pinning by email is how you reach apps you have purchased: the dispenser only
+                looks at accounts your API key owns, and never puts a private account into the
+                community rotation.
+              </p>
+            </CardContent>
+          </Card>
         </section>
       </main>
     </div>

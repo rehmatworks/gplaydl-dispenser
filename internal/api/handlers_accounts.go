@@ -28,11 +28,19 @@ type createAccountRequest struct {
 	Email      string `json:"email"`
 	AASToken   string `json:"aasToken"`
 	Visibility string `json:"visibility"`
+	// ConsentVersion records which wording the contributor agreed to when they
+	// chose to share the account with the community.
+	ConsentVersion string `json:"consentVersion"`
 }
 
+// handleCreateAccount registers or refreshes a Google account. The Android app
+// re-syncs the same address whenever it mints a new token, so this is an upsert
+// rather than a plain insert.
 func (s *Server) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 	user := userFrom(r.Context())
-	if !user.EmailVerified {
+	// Enrolled devices have no inbox to verify; the enrolment itself is proof
+	// enough that the token came from a real app install.
+	if user.Kind != "device" && !user.EmailVerified {
 		writeError(w, http.StatusForbidden, "please verify your email before adding accounts")
 		return
 	}
@@ -55,6 +63,10 @@ func (s *Server) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 	if req.Visibility != "public" && req.Visibility != "private" {
 		req.Visibility = "private"
 	}
+	if req.Visibility == "public" && req.ConsentVersion == "" {
+		writeError(w, http.StatusBadRequest, "sharing with the community pool requires consentVersion")
+		return
+	}
 
 	enc, err := s.box.Encrypt(req.AASToken)
 	if err != nil {
@@ -62,13 +74,15 @@ func (s *Server) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account, err := s.store.CreateAccount(r.Context(), user.ID, req.Email, enc, req.Visibility)
+	source := "web"
+	if user.Kind == "device" {
+		source = "app"
+	}
+
+	account, err := s.store.UpsertAccount(r.Context(), user.ID, req.Email, enc,
+		req.Visibility, source, req.ConsentVersion)
 	if err != nil {
-		if errors.Is(err, store.ErrDuplicate) {
-			writeError(w, http.StatusConflict, "this Google account is already registered")
-			return
-		}
-		s.log.Error("create account", "err", err)
+		s.log.Error("save account", "err", err)
 		writeError(w, http.StatusInternalServerError, "could not save account")
 		return
 	}
