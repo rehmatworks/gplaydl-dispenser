@@ -28,6 +28,13 @@ export default function Landing() {
     api.publicStats().then(setStats).catch(() => {})
   }, [])
 
+  // The browser resolves the initial hash before React has rendered the
+  // target, so /#terms and /#privacy from the app would land on the hero.
+  useEffect(() => {
+    const id = window.location.hash.slice(1)
+    if (id) document.getElementById(id)?.scrollIntoView()
+  }, [])
+
   const downloadUrl = release?.url || fallbackDownload
   const origin = window.location.origin
 
