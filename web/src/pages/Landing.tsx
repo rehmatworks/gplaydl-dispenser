@@ -109,11 +109,11 @@ export default function Landing() {
 
         <section className="border-y border-border/70 bg-card/25">
           <div className="mx-auto grid max-w-6xl grid-cols-3 divide-x divide-border/70 px-6 py-6 text-center">
-            <div id="terms">
+            <div>
               <p className="text-2xl font-bold text-primary">{stats?.publicAccounts ?? "—"}</p>
               <p className="mt-1 text-xs text-muted-foreground">shared accounts</p>
             </div>
-            <div id="privacy">
+            <div>
               <p className="text-2xl font-bold">{stats?.contributors ?? "—"}</p>
               <p className="mt-1 text-xs text-muted-foreground">contributors</p>
             </div>
@@ -191,7 +191,7 @@ export default function Landing() {
 
         <section className="border-y border-border/70 bg-card/25">
           <div className="mx-auto grid max-w-6xl gap-8 px-6 py-16 md:grid-cols-2">
-            <div>
+            <div id="terms" className="scroll-mt-24">
               <ShieldAlert className="size-7 text-chart-4" />
               <h2 className="mt-4 text-2xl font-bold">Use a spare Google account</h2>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
@@ -200,7 +200,7 @@ export default function Landing() {
                 client access at any time.
               </p>
             </div>
-            <div>
+            <div id="privacy" className="scroll-mt-24">
               <Users className="size-7 text-primary" />
               <h2 className="mt-4 text-2xl font-bold">You stay in control</h2>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
@@ -221,6 +221,12 @@ export default function Landing() {
           </a>
           <a href={downloadUrl} className="hover:text-foreground">
             Download app
+          </a>
+          <a href="#terms" className="hover:text-foreground">
+            Sharing terms
+          </a>
+          <a href="#privacy" className="hover:text-foreground">
+            Privacy
           </a>
         </div>
       </footer>
