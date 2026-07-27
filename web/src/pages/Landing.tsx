@@ -60,32 +60,33 @@ export default function Landing() {
             <div className="animate-fade-up">
               <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/8 px-3 py-1.5 text-sm text-primary">
                 <CheckCircle2 className="size-4" />
-                Passwordless and community-run
+                Community-run · no signup
               </div>
               <h1 className="max-w-3xl text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl">
-                Download from Google Play with{" "}
-                <span className="text-aurora">gplaydl</span>
+                A <span className="text-aurora">community pool</span> for Google Play logins
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-                Install the Authenticator, add a spare Google account, and choose whether to
-                help the public pool or keep the account private. No dispenser signup required.
+                Every token this dispenser hands out comes from a spare Google account someone
+                shared. Contribute one with the Authenticator app: sign in with a throwaway
+                account, then choose whether it joins the public pool or stays private to you.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Button asChild size="lg" className="btn-aurora h-12 rounded-xl px-6">
                   <a href={downloadUrl}>
                     <Download className="size-5" />
-                    Download Authenticator {release ? `v${release.version}` : ""}
+                    Contribute an account
                   </a>
                 </Button>
                 <Button asChild size="lg" variant="outline" className="glass h-12 rounded-xl px-6">
-                  <a href="#quick-start">
-                    Try gplaydl
+                  <a href="#use">
+                    Use the pool
                     <ArrowRight className="size-4" />
                   </a>
                 </Button>
               </div>
               <p className="mt-4 text-xs text-muted-foreground">
-                Android 7.0 or newer · signed APK ·{" "}
+                Authenticator {release ? `v${release.version}` : "app"} · Android 7.0 or newer ·
+                signed APK ·{" "}
                 {release?.sha256 ? `SHA-256 ${release.sha256.slice(0, 12)}…` : "latest release"}
               </p>
             </div>
@@ -104,7 +105,7 @@ export default function Landing() {
           </div>
         </section>
 
-        <section id="quick-start" className="mx-auto max-w-4xl px-6 pb-20">
+        <section id="use" className="mx-auto max-w-4xl px-6 pb-20 scroll-mt-24">
           <Card className="glass-strong rounded-3xl border-0">
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-start gap-4">
@@ -112,15 +113,16 @@ export default function Landing() {
                   <KeyRound className="size-5 text-primary" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold">Try the community pool</h2>
+                  <h2 className="text-2xl font-bold">Point a client at the pool</h2>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    No dispenser account or API key is needed for public downloads.
+                    Public accounts need no signup or API key. Any client that speaks the same
+                    dispenser API works.
                   </p>
                 </div>
               </div>
               <div className="mt-6">
                 <CommandBlock
-                  label="Download an app"
+                  label="Anonymous token endpoint"
                   command={`gplaydl download com.google.android.calculator -d ${origin}/api/auth`}
                 />
               </div>
