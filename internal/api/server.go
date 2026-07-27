@@ -81,15 +81,15 @@ func (s *Server) Router() http.Handler {
 			r.Delete("/accounts/{id}", s.handleDeleteAccount)
 			r.Post("/accounts/{id}/test", s.handleTestAccount)
 
+			// Pool health is no longer rendered anywhere, so this is the only
+			// way to read it. It stays behind a session or API key.
 			r.Get("/stats", s.handleStats)
-			r.Get("/timeline", s.handleTimeline)
 			r.Get("/devices", s.handleDevices)
 		})
 
-		// Public: landing-page stats and the app release pointer.
+		// Public: the app release pointer, and nothing else.
 		r.Group(func(r chi.Router) {
 			r.Use(s.authRateLimit())
-			r.Get("/public-stats", s.handlePublicStats)
 			r.Get("/app/latest", s.handleAppLatest)
 		})
 	})

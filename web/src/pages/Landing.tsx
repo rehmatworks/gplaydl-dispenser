@@ -2,14 +2,12 @@ import { CommandBlock } from "@/components/CommandBlock"
 import { Logo } from "@/components/Logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { api, type AppRelease, type PublicStats } from "@/lib/api"
+import { api, type AppRelease } from "@/lib/api"
 import {
   ArrowRight,
   CheckCircle2,
   Download,
-  Globe2,
   KeyRound,
-  Lock,
   ShieldAlert,
   Smartphone,
   Users
@@ -21,11 +19,9 @@ const fallbackDownload = "/downloads/gplaydl-authenticator-latest.apk"
 
 export default function Landing() {
   const [release, setRelease] = useState<AppRelease | null>(null)
-  const [stats, setStats] = useState<PublicStats | null>(null)
 
   useEffect(() => {
     api.appLatest().then(setRelease).catch(() => {})
-    api.publicStats().then(setStats).catch(() => {})
   }, [])
 
   // The browser resolves the initial hash before React has rendered the
@@ -48,12 +44,6 @@ export default function Landing() {
             <Logo />
           </a>
           <div className="flex items-center gap-2">
-            <a
-              href="#how-it-works"
-              className="hidden rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-foreground sm:block"
-            >
-              How it works
-            </a>
             <Button asChild variant="outline" size="sm" className="glass rounded-xl">
               <a href="/pair">
                 <Smartphone className="size-4" />
@@ -111,64 +101,6 @@ export default function Landing() {
                 </p>
               </CardContent>
             </Card>
-          </div>
-        </section>
-
-        <section className="border-y border-border/70 bg-card/25">
-          <div className="mx-auto grid max-w-6xl grid-cols-3 divide-x divide-border/70 px-6 py-6 text-center">
-            <div>
-              <p className="text-2xl font-bold text-primary">{stats?.publicAccounts ?? "—"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">shared accounts</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{stats?.contributors ?? "—"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">contributors</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{stats?.mints24h ?? "—"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Play sessions today</p>
-            </div>
-          </div>
-        </section>
-
-        <section id="how-it-works" className="mx-auto max-w-6xl px-6 py-20">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-              Three simple steps
-            </p>
-            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">The app handles the sensitive part</h2>
-            <p className="mt-4 text-muted-foreground">
-              Accounts are added on your phone. The website is only an optional paired dashboard.
-            </p>
-          </div>
-          <div className="mt-10 grid gap-4 md:grid-cols-3">
-            {[
-              {
-                icon: Smartphone,
-                title: "1. Install the app",
-                body: "Accept the clear sharing terms and sign in to Google inside its embedded setup screen."
-              },
-              {
-                icon: Lock,
-                title: "2. Choose sharing",
-                body: "Make each account Community or Private before it is saved. You can change this later."
-              },
-              {
-                icon: Globe2,
-                title: "3. Use gplaydl",
-                body: "Use the public pool without an account, or copy your private API key from the app."
-              }
-            ].map((step) => (
-              <Card key={step.title} className="glass card-hover rounded-3xl border-0">
-                <CardContent className="p-6">
-                  <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20">
-                    <step.icon className="size-5 text-primary" />
-                  </div>
-                  <h3 className="mt-5 text-lg font-semibold">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
-                </CardContent>
-              </Card>
-            ))}
           </div>
         </section>
 

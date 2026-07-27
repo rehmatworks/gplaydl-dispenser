@@ -185,29 +185,6 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, stats)
 }
 
-func (s *Server) handlePublicStats(w http.ResponseWriter, r *http.Request) {
-	stats, err := s.store.Stats(r.Context(), "")
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "could not load stats")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"publicAccounts": stats.PublicAccounts,
-		"mints24h":       stats.Mints24h,
-		"totalMints":     stats.TotalMints,
-		"contributors":   stats.Contributors,
-	})
-}
-
-func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
-	timeline, err := s.store.MintTimeline(r.Context())
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "could not load timeline")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"timeline": timeline})
-}
-
 func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 	devices, err := gplay.ListDevices(s.cfg.ResourcesDir)
 	if err != nil {

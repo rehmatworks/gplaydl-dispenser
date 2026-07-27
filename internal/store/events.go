@@ -1,9 +1,6 @@
 package store
 
-import (
-	"context"
-	"time"
-)
+import "context"
 
 // RecordMintOutcome books a dispense against the hourly bucket and the
 // lifetime totals. Both are counter updates, so the tables stay a fixed size
@@ -75,41 +72,4 @@ func (s *Store) Stats(ctx context.Context, ownerID string) (*PoolStats, error) {
 		return nil, err
 	}
 	return st, nil
-}
-
-type MintBucket struct {
-	Hour     time.Time `json:"hour"`
-	Success  int64     `json:"success"`
-	Failures int64     `json:"failures"`
-}
-
-// MintTimeline returns hourly mint counts for the last 24 hours.
-func (s *Store) MintTimeline(ctx context.Context) ([]MintBucket, error) {
-	// generate_series keeps quiet hours in the result as explicit zeroes.
-	rows, err := s.pool.Query(ctx, `
-		SELECT
-			h AS hour,
-			coalesce(m.success, 0),
-			coalesce(m.failures, 0)
-		FROM generate_series(
-			date_trunc('hour', now()) - interval '23 hours',
-			date_trunc('hour', now()),
-			interval '1 hour'
-		) AS h
-		LEFT JOIN mint_stats_hourly m ON m.hour = h
-		ORDER BY hour`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	buckets := []MintBucket{}
-	for rows.Next() {
-		var b MintBucket
-		if err := rows.Scan(&b.Hour, &b.Success, &b.Failures); err != nil {
-			return nil, err
-		}
-		buckets = append(buckets, b)
-	}
-	return buckets, rows.Err()
 }

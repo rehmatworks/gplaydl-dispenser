@@ -20,36 +20,11 @@ export interface Account {
   lastSyncedAt: string | null
 }
 
-export interface PoolStats {
-  publicAccounts: number
-  privateAccounts: number
-  activeAccounts: number
-  flaggedAccounts: number
-  mints24h: number
-  failures24h: number
-  totalMints: number
-  contributors: number
-  sharedAccounts: number
-}
-
-export interface PublicStats {
-  publicAccounts: number
-  mints24h: number
-  totalMints: number
-  contributors: number
-}
-
 export interface AppRelease {
   version: string
   versionCode: number
   url: string
   sha256: string
-}
-
-export interface MintBucket {
-  hour: string
-  success: number
-  failures: number
 }
 
 /** Must match CONSENT_VERSION in the Android app and the wording on this site. */
@@ -84,14 +59,6 @@ export const api = {
 
   accounts: () => request<{ accounts: Account[] }>("/api/v1/accounts"),
 
-  addAccount: (email: string, aasToken: string, visibility: "public" | "private") =>
-    request<{ account: Account }>("/api/v1/accounts", {
-      method: "POST",
-      // Sharing publicly is only accepted alongside the consent wording the
-      // contributor agreed to; the dialog shows the same text.
-      body: JSON.stringify({ email, aasToken, visibility, consentVersion: CONSENT_VERSION })
-    }),
-
   updateAccount: (id: string, patch: { visibility: "public" | "private" }) =>
     request<{ account: Account }>(`/api/v1/accounts/${id}`, {
       method: "PATCH",
@@ -103,18 +70,6 @@ export const api = {
 
   deleteAccount: (id: string) =>
     request<{ status: string }>(`/api/v1/accounts/${id}`, { method: "DELETE" }),
-
-  testAccount: (id: string) =>
-    request<{ success: boolean; error: string; durationMs: number }>(
-      `/api/v1/accounts/${id}/test`,
-      { method: "POST" }
-    ),
-
-  stats: () => request<PoolStats>("/api/v1/stats"),
-
-  publicStats: () => request<PublicStats>("/api/v1/public-stats"),
-
-  timeline: () => request<{ timeline: MintBucket[] }>("/api/v1/timeline"),
 
   appLatest: () => request<AppRelease>("/api/v1/app/latest"),
 

@@ -3,7 +3,7 @@ import { CommandBlock } from "@/components/CommandBlock"
 import { Logo } from "@/components/Logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { api, type Account, type AppRelease, type PoolStats } from "@/lib/api"
+import { api, type Account, type AppRelease } from "@/lib/api"
 import { AlertTriangle, Download, Globe2, LogOut, RefreshCw, ShieldCheck } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { useCallback, useEffect, useState } from "react"
@@ -12,7 +12,6 @@ import { toast } from "sonner"
 export default function Dashboard() {
   const { user, setUser } = useAuth()
   const [accounts, setAccounts] = useState<Account[]>([])
-  const [stats, setStats] = useState<PoolStats | null>(null)
   const [release, setRelease] = useState<AppRelease | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -21,9 +20,8 @@ export default function Dashboard() {
   const refresh = useCallback(async (quiet = false) => {
     if (!quiet) setRefreshing(true)
     try {
-      const [accountResult, statsResult] = await Promise.all([api.accounts(), api.stats()])
+      const accountResult = await api.accounts()
       setAccounts(accountResult.accounts)
-      setStats(statsResult)
       setLoadError(false)
     } catch {
       setLoadError(true)
@@ -159,12 +157,6 @@ export default function Dashboard() {
               For private accounts, copy the API key from the Android app and provide it through
               gplaydl&apos;s API-key option. Never put it in a shared command or screenshot.
             </p>
-            {stats && (
-              <p className="text-xs text-muted-foreground">
-                Community health: {stats.publicAccounts} public accounts · {stats.mints24h} successful
-                Play sessions in 24 hours · {stats.totalMints} all-time.
-              </p>
-            )}
             {release?.url && (
               <Button asChild variant="outline" className="glass rounded-xl">
                 <a href={release.url}>
