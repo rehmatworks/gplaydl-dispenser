@@ -217,6 +217,100 @@ func TestPairingOnlyAPI(t *testing.T) {
 			t.Fatalf("make private: got %d: %s", makePrivate.Code, makePrivate.Body.String())
 		}
 	})
+
+	// Runs after the subtest above, which leaves spare@example.test owned by
+	// user. Signing the same address in on a second device proves control of
+	// it, so the account moves across instead of being duplicated.
+	t.Run("re-authenticating an address moves it to the newest owner", func(t *testing.T) {
+		secondKey := "second-device-key"
+		second, err := st.CreateDeviceUser(
+			ctx,
+			crypto.HashToken("second-device-secret"),
+			"Second phone",
+			crypto.HashToken(secondKey),
+			currentConsentVersion,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		token := "aas_et/" + strings.Repeat("y", 40)
+		claim := performJSONRequest(
+			router,
+			http.MethodPost,
+			"/api/v1/accounts",
+			`{"email":"spare@example.test","aasToken":"`+token+`","visibility":"private"}`,
+			map[string]string{"X-Api-Key": secondKey},
+		)
+		if claim.Code != http.StatusCreated {
+			t.Fatalf("claim from second device: got %d: %s", claim.Code, claim.Body.String())
+		}
+
+		var rows int
+		if err := admin.QueryRow(ctx,
+			`SELECT count(*) FROM accounts WHERE email = 'spare@example.test'`,
+		).Scan(&rows); err != nil {
+			t.Fatal(err)
+		}
+		if rows != 1 {
+			t.Fatalf("rows for the address: got %d, want 1", rows)
+		}
+
+		gained, err := st.AccountsByOwner(ctx, second.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(gained) != 1 || gained[0].Email != "spare@example.test" {
+			t.Fatalf("second device owns: %#v", gained)
+		}
+
+		lost, err := st.AccountsByOwner(ctx, user.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(lost) != 0 {
+			t.Fatalf("first device should have lost the account, still has %d", len(lost))
+		}
+
+		// The new owner's token has to be the one the pool dispenses.
+		stored, err := st.NextAccountForEmail(ctx, second.ID, "spare@example.test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		plain, err := box.Decrypt(stored.AASTokenEnc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if plain != token {
+			t.Fatal("dispensed token is not the one the new owner synced")
+		}
+	})
+
+	// A case-different spelling is the same Google account, so it must not slip
+	// past the constraint as a second row.
+	t.Run("addresses are matched without regard to case", func(t *testing.T) {
+		token := "aas_et/" + strings.Repeat("z", 40)
+		mixed := performJSONRequest(
+			router,
+			http.MethodPost,
+			"/api/v1/accounts",
+			`{"email":"SPARE@Example.Test","aasToken":"`+token+`","visibility":"private"}`,
+			map[string]string{"X-Api-Key": "second-device-key"},
+		)
+		if mixed.Code != http.StatusCreated {
+			t.Fatalf("mixed case sync: got %d: %s", mixed.Code, mixed.Body.String())
+		}
+
+		var rows int
+		if err := admin.QueryRow(ctx,
+			`SELECT count(*) FROM accounts WHERE email = 'spare@example.test'`,
+		).Scan(&rows); err != nil {
+			t.Fatal(err)
+		}
+		if rows != 1 {
+			t.Fatalf("rows after mixed case sync: got %d, want 1", rows)
+		}
+	})
 }
 
 func performRequest(

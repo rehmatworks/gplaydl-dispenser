@@ -35,9 +35,15 @@ func scanAccount(row interface{ Scan(...any) error }) (*Account, error) {
 	return a, nil
 }
 
-// UpsertAccount stores a Google account for an owner, replacing the token if
-// that owner already registered the same address. The app re-syncs whenever it
-// re-mints, so an insert-only path would reject every refresh.
+// UpsertAccount stores a Google account, replacing the token if the address is
+// already registered. The app re-syncs whenever it re-mints, so an insert-only
+// path would reject every refresh.
+//
+// A Google address exists once across the whole dispenser. Completing sign-in
+// proves control of it, so a sync from a different device takes the account
+// over rather than adding a second copy: the pool would otherwise count one
+// Google account as several, and every previous owner would keep a live token
+// for an address they may no longer control.
 func (s *Store) UpsertAccount(ctx context.Context, ownerID, email string, aasTokenEnc []byte, visibility, source, consentVersion string) (*Account, error) {
 	row := s.pool.QueryRow(ctx, `
 		INSERT INTO accounts (owner_id, email, aas_token_enc, visibility, source,
@@ -45,7 +51,8 @@ func (s *Store) UpsertAccount(ctx context.Context, ownerID, email string, aasTok
 		                      shared_at)
 		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), now(),
 		        CASE WHEN $4 = 'public' THEN now() END)
-		ON CONFLICT (owner_id, email) DO UPDATE SET
+		ON CONFLICT (email) DO UPDATE SET
+			owner_id        = EXCLUDED.owner_id,
 			aas_token_enc   = EXCLUDED.aas_token_enc,
 			visibility      = EXCLUDED.visibility,
 			source          = EXCLUDED.source,
