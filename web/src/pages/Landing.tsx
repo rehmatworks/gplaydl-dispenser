@@ -154,17 +154,17 @@ export default function Landing() {
 
       <footer className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <Logo className="opacity-80" />
-        <div className="flex gap-5">
-          <a href="/pair" className="hover:text-foreground">
+        <div className="flex flex-wrap gap-x-5 gap-y-2">
+          <a href="/pair" className="whitespace-nowrap hover:text-foreground">
             Pair dashboard
           </a>
-          <a href={downloadUrl} className="hover:text-foreground">
+          <a href={downloadUrl} className="whitespace-nowrap hover:text-foreground">
             Download app
           </a>
-          <a href="#terms" className="hover:text-foreground">
+          <a href="#terms" className="whitespace-nowrap hover:text-foreground">
             Sharing terms
           </a>
-          <a href="#privacy" className="hover:text-foreground">
+          <a href="#privacy" className="whitespace-nowrap hover:text-foreground">
             Privacy
           </a>
         </div>
