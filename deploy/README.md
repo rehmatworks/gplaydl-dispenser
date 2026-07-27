@@ -40,9 +40,6 @@ MINT_CONCURRENCY=64
 RESOURCES_DIR=/opt/gplaydl-dispenser/resources
 DEFAULT_DEVICE=arm64_xxhdpi
 PUBLIC_URL=https://dispenser.gplaydl.com
-BREVO_API_KEY=CHANGE-ME
-MAIL_FROM=no-reply@gplaydl.com
-MAIL_FROM_NAME=gplaydl dispenser
 EOF
 sudo chmod 600 /etc/gplaydl-dispenser/env
 ```
@@ -56,11 +53,16 @@ unrecoverable.
 in-app update check. Point it at whatever is currently published:
 
 ```bash
-APP_VERSION=1.0.0
-APP_VERSION_CODE=1
+APP_VERSION=1.0.1
+APP_VERSION_CODE=2
 APP_SHA256=<sha256 of the published apk>
-APP_DOWNLOAD_URL=https://dispenser.gplaydl.com/downloads/gplaydl-authenticator-latest.apk
+APP_DOWNLOAD_URL=https://dispenser.gplaydl.com/downloads/gplaydl-authenticator-1.0.1.apk
 ```
+
+`APP_DOWNLOAD_URL` points at the *versioned* filename, not the `-latest.apk`
+symlink, so a cached copy of the old build can never be served under the new
+version's URL. Bump it with every release. The symlink is still maintained
+because the website falls back to it when `/api/v1/app/latest` is unreachable.
 
 Publishing a new APK build is two commands plus an env bump:
 
@@ -73,9 +75,14 @@ ssh root@server '
     /var/www/downloads/gplaydl-authenticator-latest.apk'
 ```
 
-Then update `APP_VERSION`, `APP_VERSION_CODE` and `APP_SHA256` in
-`/etc/gplaydl-dispenser/env` and restart the service. Keep old versioned files
-around so devices that already have a download link do not 404.
+Then update `APP_VERSION`, `APP_VERSION_CODE`, `APP_SHA256` and
+`APP_DOWNLOAD_URL` in `/etc/gplaydl-dispenser/env` and restart the service.
+Keep old versioned files around so devices that already have a download link do
+not 404.
+
+`APP_VERSION_CODE` must actually increase. The in-app check only offers an
+update when it is greater than the installed build, so republishing under the
+same code ships the release to nobody.
 
 The APK must be signed with the same keystore every time or existing installs
 cannot update in place. The keystore and its `signing.properties` live in the

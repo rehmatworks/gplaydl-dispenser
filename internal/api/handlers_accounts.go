@@ -13,6 +13,8 @@ import (
 	"gplaydl-dispenser/internal/store"
 )
 
+const currentConsentVersion = "2026-07-27"
+
 func (s *Server) handleListAccounts(w http.ResponseWriter, r *http.Request) {
 	user := userFrom(r.Context())
 	accounts, err := s.store.AccountsByOwner(r.Context(), user.ID)
@@ -38,12 +40,6 @@ type createAccountRequest struct {
 // rather than a plain insert.
 func (s *Server) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 	user := userFrom(r.Context())
-	// Enrolled devices have no inbox to verify; the enrolment itself is proof
-	// enough that the token came from a real app install.
-	if user.Kind != "device" && !user.EmailVerified {
-		writeError(w, http.StatusForbidden, "please verify your email before adding accounts")
-		return
-	}
 
 	var req createAccountRequest
 	if !readJSON(w, r, &req) {
@@ -63,8 +59,8 @@ func (s *Server) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 	if req.Visibility != "public" && req.Visibility != "private" {
 		req.Visibility = "private"
 	}
-	if req.Visibility == "public" && req.ConsentVersion == "" {
-		writeError(w, http.StatusBadRequest, "sharing with the community pool requires consentVersion")
+	if req.Visibility == "public" && req.ConsentVersion != currentConsentVersion {
+		writeError(w, http.StatusBadRequest, "accept the current sharing terms before making this account public")
 		return
 	}
 
@@ -74,13 +70,8 @@ func (s *Server) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	source := "web"
-	if user.Kind == "device" {
-		source = "app"
-	}
-
 	account, err := s.store.UpsertAccount(r.Context(), user.ID, req.Email, enc,
-		req.Visibility, source, req.ConsentVersion)
+		req.Visibility, "app", req.ConsentVersion)
 	if err != nil {
 		s.log.Error("save account", "err", err)
 		writeError(w, http.StatusInternalServerError, "could not save account")
@@ -90,8 +81,8 @@ func (s *Server) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateAccountRequest struct {
-	Visibility *string `json:"visibility"`
-	Status     *string `json:"status"`
+	Visibility     *string `json:"visibility"`
+	ConsentVersion string  `json:"consentVersion"`
 }
 
 func (s *Server) handleUpdateAccount(w http.ResponseWriter, r *http.Request) {
@@ -105,12 +96,17 @@ func (s *Server) handleUpdateAccount(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "visibility must be public or private")
 		return
 	}
-	if req.Status != nil && *req.Status != "active" && *req.Status != "disabled" {
-		writeError(w, http.StatusBadRequest, "status must be active or disabled")
+	if req.Visibility != nil && *req.Visibility == "public" && req.ConsentVersion != currentConsentVersion {
+		writeError(w, http.StatusBadRequest, "accept the current sharing terms before making this account public")
 		return
 	}
-
-	account, err := s.store.UpdateAccount(r.Context(), chi.URLParam(r, "id"), user.ID, req.Visibility, req.Status)
+	account, err := s.store.UpdateAccount(
+		r.Context(),
+		chi.URLParam(r, "id"),
+		user.ID,
+		req.Visibility,
+		req.ConsentVersion,
+	)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "account not found")
@@ -173,14 +169,7 @@ func (s *Server) handleTestAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = s.store.RecordMintResult(r.Context(), account.ID, success)
-	_ = s.store.RecordMintEvent(r.Context(), store.MintEvent{
-		AccountID:  account.ID,
-		UserID:     user.ID,
-		Anonymous:  false,
-		Success:    success,
-		Error:      errMsg,
-		DurationMS: int(duration.Milliseconds()),
-	})
+	_ = s.store.RecordMintOutcome(r.Context(), success)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"success":    success,

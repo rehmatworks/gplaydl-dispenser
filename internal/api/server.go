@@ -14,7 +14,6 @@ import (
 	"gplaydl-dispenser/internal/config"
 	"gplaydl-dispenser/internal/crypto"
 	"gplaydl-dispenser/internal/gplay"
-	"gplaydl-dispenser/internal/mail"
 	"gplaydl-dispenser/internal/store"
 )
 
@@ -23,13 +22,12 @@ type Server struct {
 	store  *store.Store
 	box    *crypto.Box
 	gplay  *gplay.Client
-	mailer *mail.Mailer
 	log    *slog.Logger
 	static fs.FS
 }
 
-func NewServer(cfg *config.Config, st *store.Store, box *crypto.Box, gp *gplay.Client, mailer *mail.Mailer, static fs.FS, log *slog.Logger) *Server {
-	return &Server{cfg: cfg, store: st, box: box, gplay: gp, mailer: mailer, static: static, log: log}
+func NewServer(cfg *config.Config, st *store.Store, box *crypto.Box, gp *gplay.Client, static fs.FS, log *slog.Logger) *Server {
+	return &Server{cfg: cfg, store: st, box: box, gplay: gp, static: static, log: log}
 }
 
 func (s *Server) Router() http.Handler {
@@ -56,11 +54,6 @@ func (s *Server) Router() http.Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(s.authRateLimit())
-			r.Post("/register", s.handleRegister)
-			r.Post("/login", s.handleLogin)
-			r.Post("/verify-email", s.handleVerifyEmail)
-			r.Post("/forgot-password", s.handleForgotPassword)
-			r.Post("/reset-password", s.handleResetPassword)
 			r.Post("/pair/claim", s.handleClaimPairingCode)
 		})
 
@@ -74,8 +67,6 @@ func (s *Server) Router() http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireSession)
 			r.Post("/logout", s.handleLogout)
-			r.Post("/me/api-key", s.handleRotateAPIKey)
-			r.Post("/resend-verification", s.handleResendVerification)
 		})
 
 		// Shared by the dashboard (session cookie) and the app (API key).

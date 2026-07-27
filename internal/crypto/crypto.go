@@ -8,8 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 // Box encrypts/decrypts secrets at rest with AES-256-GCM.
@@ -47,15 +45,6 @@ func (b *Box) Decrypt(ciphertext []byte) (string, error) {
 		return "", err
 	}
 	return string(plain), nil
-}
-
-func HashPassword(password string) (string, error) {
-	h, err := bcrypt.GenerateFromPassword([]byte(password), 12)
-	return string(h), err
-}
-
-func CheckPassword(hash, password string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
 
 // RandomToken returns a URL-safe random token of n bytes entropy.

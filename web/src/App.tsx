@@ -1,46 +1,33 @@
-import { Navigate, Route, Routes } from "react-router-dom"
+import { useEffect } from "react"
 import { useAuth } from "./lib/auth"
 import Dashboard from "./pages/Dashboard"
-import ForgotPassword from "./pages/ForgotPassword"
 import Landing from "./pages/Landing"
-import Login from "./pages/Login"
 import Pair from "./pages/Pair"
-import Register from "./pages/Register"
-import ResetPassword from "./pages/ResetPassword"
-import VerifyEmail from "./pages/VerifyEmail"
 
-function Protected({ children }: { children: React.ReactNode }) {
+function ProtectedDashboard() {
   const { user, loading } = useAuth()
-  if (loading) {
+
+  useEffect(() => {
+    if (!loading && !user) window.location.replace("/pair")
+  }, [loading, user])
+
+  if (loading || !user) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
         <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     )
   }
-  if (!user) return <Navigate to="/login" replace />
-  return <>{children}</>
+  return <Dashboard />
 }
 
 export default function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/pair" element={<Pair />} />
-      <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route
-        path="/dashboard"
-        element={
-          <Protected>
-            <Dashboard />
-          </Protected>
-        }
-      />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  )
+  switch (window.location.pathname.replace(/\/+$/, "") || "/") {
+    case "/pair":
+      return <Pair />
+    case "/dashboard":
+      return <ProtectedDashboard />
+    default:
+      return <Landing />
+  }
 }

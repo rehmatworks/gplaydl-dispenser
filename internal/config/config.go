@@ -19,10 +19,7 @@ type Config struct {
 	ResourcesDir    string        // device .properties files
 	DefaultDevice   string
 	PublicURL       string // canonical base URL, embedded in minted auth bundles
-	BrevoAPIKey     string // empty = email flows disabled, users auto-verified
-	MailFrom        string
-	MailFromName    string
-	Dev             bool // relaxes cookie security for local development
+	Dev             bool   // relaxes cookie security for local development
 
 	// Android app release metadata, served to the app's update check and to the
 	// website download button.
@@ -68,9 +65,6 @@ func Load() (*Config, error) {
 		ResourcesDir:    env("RESOURCES_DIR", "resources"),
 		DefaultDevice:   env("DEFAULT_DEVICE", "arm64_xxhdpi"),
 		PublicURL:       strings.TrimRight(env("PUBLIC_URL", "https://dispenser.gplaydl.com"), "/"),
-		BrevoAPIKey:     os.Getenv("BREVO_API_KEY"),
-		MailFrom:        env("MAIL_FROM", "no-reply@gplaydl.com"),
-		MailFromName:    env("MAIL_FROM_NAME", "gplaydl dispenser"),
 		Dev:             os.Getenv("DISPENSER_DEV") == "1",
 
 		AppVersion:     env("APP_VERSION", "1.0.0"),

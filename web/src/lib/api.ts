@@ -1,10 +1,7 @@
 export interface User {
   id: string
-  email: string
-  emailVerified: boolean
   createdAt: string
-  /** "device" users were enrolled by the Android app and have no password. */
-  kind: "web" | "device"
+  kind: "device"
   label: string
 }
 
@@ -81,44 +78,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  register: (email: string, password: string) =>
-    request<{ user: User; apiKey: string }>("/api/v1/register", {
-      method: "POST",
-      body: JSON.stringify({ email, password })
-    }),
-
-  login: (email: string, password: string) =>
-    request<{ user: User }>("/api/v1/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password })
-    }),
-
   logout: () => request<{ status: string }>("/api/v1/logout", { method: "POST" }),
 
-  verifyEmail: (token: string) =>
-    request<{ status: string }>("/api/v1/verify-email", {
-      method: "POST",
-      body: JSON.stringify({ token })
-    }),
-
-  resendVerification: () =>
-    request<{ status: string }>("/api/v1/resend-verification", { method: "POST" }),
-
-  forgotPassword: (email: string) =>
-    request<{ status: string }>("/api/v1/forgot-password", {
-      method: "POST",
-      body: JSON.stringify({ email })
-    }),
-
-  resetPassword: (token: string, password: string) =>
-    request<{ status: string }>("/api/v1/reset-password", {
-      method: "POST",
-      body: JSON.stringify({ token, password })
-    }),
-
   me: () => request<{ user: User }>("/api/v1/me"),
-
-  rotateApiKey: () => request<{ apiKey: string }>("/api/v1/me/api-key", { method: "POST" }),
 
   accounts: () => request<{ accounts: Account[] }>("/api/v1/accounts"),
 
@@ -130,10 +92,13 @@ export const api = {
       body: JSON.stringify({ email, aasToken, visibility, consentVersion: CONSENT_VERSION })
     }),
 
-  updateAccount: (id: string, patch: { visibility?: string; status?: string }) =>
+  updateAccount: (id: string, patch: { visibility: "public" | "private" }) =>
     request<{ account: Account }>(`/api/v1/accounts/${id}`, {
       method: "PATCH",
-      body: JSON.stringify(patch)
+      body: JSON.stringify({
+        ...patch,
+        ...(patch.visibility === "public" ? { consentVersion: CONSENT_VERSION } : {})
+      })
     }),
 
   deleteAccount: (id: string) =>

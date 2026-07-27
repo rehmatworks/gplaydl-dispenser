@@ -7,7 +7,6 @@ import { api, ApiError } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { Smartphone } from "lucide-react"
 import { useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
 /**
@@ -15,7 +14,6 @@ import { toast } from "sonner"
  * so the app shows a one-shot code and this trades it for a session.
  */
 export default function Pair() {
-  const navigate = useNavigate()
   const { setUser } = useAuth()
   const [code, setCode] = useState("")
   const [busy, setBusy] = useState(false)
@@ -26,7 +24,7 @@ export default function Pair() {
     try {
       const res = await api.claimPairing(code)
       setUser(res.user)
-      navigate("/dashboard")
+      window.location.assign("/dashboard")
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Could not pair this device")
     } finally {
@@ -38,9 +36,9 @@ export default function Pair() {
     <div className="relative flex min-h-dvh items-center justify-center px-6">
       <div className="aurora-bg" />
       <div className="w-full max-w-md">
-        <Link to="/" className="mb-8 flex justify-center">
+        <a href="/" className="mb-8 flex justify-center">
           <Logo />
-        </Link>
+        </a>
         <Card className="glass-strong animate-fade-up rounded-3xl border-0">
           <CardHeader className="pb-2 text-center">
             <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-aurora-teal/20 to-aurora-violet/20 ring-1 ring-aurora-teal/20">
@@ -75,10 +73,8 @@ export default function Pair() {
               </Button>
             </form>
             <p className="mt-5 text-center text-sm text-muted-foreground">
-              Codes expire after 10 minutes and work once. Signed up with an email instead?{" "}
-              <Link to="/login" className="text-aurora-teal hover:underline">
-                Sign in
-              </Link>
+              Codes expire after 10 minutes and work once. Generate a new code in the Android
+              app whenever you need to reconnect.
             </p>
           </CardContent>
         </Card>

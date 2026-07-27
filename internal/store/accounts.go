@@ -51,7 +51,7 @@ func (s *Store) UpsertAccount(ctx context.Context, ownerID, email string, aasTok
 			source          = EXCLUDED.source,
 			consent_version = COALESCE(EXCLUDED.consent_version, accounts.consent_version),
 			-- a fresh token deserves a clean slate in the rotation
-			status          = CASE WHEN accounts.status = 'disabled' THEN 'disabled' ELSE 'active' END,
+			status          = 'active',
 			failure_count   = 0,
 			last_synced_at  = now(),
 			shared_at       = CASE
@@ -91,13 +91,14 @@ func (s *Store) AccountByID(ctx context.Context, id, ownerID string) (*Account, 
 	return scanAccount(row)
 }
 
-func (s *Store) UpdateAccount(ctx context.Context, id, ownerID string, visibility, status *string) (*Account, error) {
+func (s *Store) UpdateAccount(ctx context.Context, id, ownerID string, visibility *string, consentVersion string) (*Account, error) {
 	row := s.pool.QueryRow(ctx, `
 		UPDATE accounts SET
 			visibility = COALESCE($3, visibility),
-			status     = COALESCE($4, status),
-			-- manual re-enable gives the account a clean slate
-			failure_count = CASE WHEN $4 = 'active' THEN 0 ELSE failure_count END,
+			consent_version = CASE
+				WHEN $3 = 'public' THEN NULLIF($4, '')
+				ELSE consent_version
+			END,
 			shared_at = CASE
 				WHEN COALESCE($3, visibility) = 'public' THEN COALESCE(shared_at, now())
 				ELSE NULL
@@ -105,7 +106,7 @@ func (s *Store) UpdateAccount(ctx context.Context, id, ownerID string, visibilit
 			updated_at = now()
 		WHERE id = $1 AND owner_id = $2
 		RETURNING `+accountCols,
-		id, ownerID, visibility, status)
+		id, ownerID, visibility, consentVersion)
 	return scanAccount(row)
 }
 

@@ -37,6 +37,10 @@ func (s *Server) requireSession(next http.Handler) http.Handler {
 			writeError(w, http.StatusUnauthorized, "session expired")
 			return
 		}
+		if user.Kind != "device" {
+			writeError(w, http.StatusUnauthorized, "pair the Android app to continue")
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userKey, user)))
 	})
 }

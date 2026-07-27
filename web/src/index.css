@@ -3,41 +3,41 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ------------------------------------------------------------------ */
-/*  Design tokens — dark, aurora-inspired theme                        */
+/*  Design tokens — deep slate, emerald, and amber                     */
 /* ------------------------------------------------------------------ */
 
 :root,
 .dark {
-  --background: oklch(0.13 0.02 270);
+  --background: oklch(0.13 0.018 245);
   --foreground: oklch(0.94 0.01 260);
-  --card: oklch(0.17 0.025 268);
+  --card: oklch(0.18 0.022 245);
   --card-foreground: oklch(0.94 0.01 260);
-  --popover: oklch(0.16 0.025 268);
+  --popover: oklch(0.17 0.022 245);
   --popover-foreground: oklch(0.94 0.01 260);
-  --primary: oklch(0.78 0.14 185);
-  --primary-foreground: oklch(0.15 0.03 230);
-  --secondary: oklch(0.24 0.03 270);
+  --primary: oklch(0.76 0.15 165);
+  --primary-foreground: oklch(0.14 0.025 200);
+  --secondary: oklch(0.24 0.025 245);
   --secondary-foreground: oklch(0.94 0.01 260);
-  --muted: oklch(0.22 0.025 268);
+  --muted: oklch(0.22 0.022 245);
   --muted-foreground: oklch(0.65 0.02 262);
-  --accent: oklch(0.26 0.04 285);
+  --accent: oklch(0.27 0.035 200);
   --accent-foreground: oklch(0.96 0.01 260);
   --destructive: oklch(0.62 0.21 22);
   --destructive-foreground: oklch(0.97 0.01 20);
   --border: oklch(0.94 0.01 260 / 9%);
   --input: oklch(0.94 0.01 260 / 12%);
-  --ring: oklch(0.78 0.14 185 / 60%);
-  --chart-1: oklch(0.78 0.14 185);
-  --chart-2: oklch(0.68 0.19 295);
-  --chart-3: oklch(0.74 0.18 330);
-  --chart-4: oklch(0.8 0.15 85);
+  --ring: oklch(0.76 0.15 165 / 60%);
+  --chart-1: oklch(0.76 0.15 165);
+  --chart-2: oklch(0.72 0.12 205);
+  --chart-3: oklch(0.78 0.13 105);
+  --chart-4: oklch(0.8 0.14 80);
   --chart-5: oklch(0.62 0.21 22);
   --radius: 1rem;
 
-  /* Aurora palette */
-  --aurora-teal: oklch(0.78 0.14 185);
-  --aurora-violet: oklch(0.62 0.21 295);
-  --aurora-pink: oklch(0.72 0.19 330);
+  /* Compatibility names used by the existing components. */
+  --aurora-teal: oklch(0.76 0.15 165);
+  --aurora-violet: oklch(0.72 0.12 205);
+  --aurora-pink: oklch(0.8 0.14 80);
 }
 
 @theme inline {
@@ -132,8 +132,8 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     background-image:
-      radial-gradient(ellipse 70% 45% at 18% -8%, oklch(0.32 0.09 295 / 35%), transparent 60%),
-      radial-gradient(ellipse 60% 40% at 85% -5%, oklch(0.35 0.08 185 / 28%), transparent 60%);
+      radial-gradient(ellipse 70% 45% at 18% -8%, oklch(0.31 0.07 205 / 30%), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 85% -5%, oklch(0.34 0.09 165 / 26%), transparent 60%);
     background-attachment: fixed;
     min-height: 100dvh;
   }
@@ -147,7 +147,16 @@
   }
 
   ::selection {
-    background: oklch(0.78 0.14 185 / 30%);
+    background: oklch(0.76 0.15 165 / 30%);
+  }
+
+  /* shadcn controls draw their own focus ring; this covers plain elements. */
+  a:focus-visible,
+  summary:focus-visible {
+    outline-style: solid;
+    outline-width: 2px;
+    outline-color: var(--primary);
+    outline-offset: 3px;
   }
 
   ::-webkit-scrollbar {
@@ -277,7 +286,6 @@
 .grid-dots {
   background-image: radial-gradient(oklch(0.94 0.01 260 / 7%) 1px, transparent 1px);
   background-size: 28px 28px;
-  mask-image: radial-gradient(ellipse 80% 65% at 50% 0%, black 30%, transparent 75%);
 }
 
 /* Monospace inline chips (emails, tokens, endpoints) */
@@ -288,4 +296,23 @@
   border-radius: 0.5rem;
   background: oklch(0.94 0.01 260 / 7%);
   border: 1px solid oklch(0.94 0.01 260 / 10%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .aurora-bg::before,
+  .aurora-bg::after {
+    animation: none;
+  }
 }

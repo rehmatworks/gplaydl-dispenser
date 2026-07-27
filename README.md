@@ -8,9 +8,8 @@ session tokens to compatible clients like [gplaydl](https://github.com/rehmatwor
 
 ## Features
 
-- **Multi-user account pools** — users register, add Google accounts (email + AAS token),
-  and choose per-account whether to share it with the community (`public`) or keep it
-  for themselves (`private`).
+- **App-managed account pools** — Android contributors add Google accounts and choose
+  per account whether to share it with the community (`public`) or keep it private.
 - **Atomic LRU rotation in Postgres** — accounts are claimed with
   `FOR UPDATE SKIP LOCKED`, so concurrent requests rotate through distinct accounts
   without contention. Rotation state survives restarts and works across replicas.
@@ -19,8 +18,8 @@ session tokens to compatible clients like [gplaydl](https://github.com/rehmatwor
   drop out of rotation; a successful mint reactivates them.
 - **Concurrent minting** — bounded parallel handshakes, per-mint timeouts, and
   automatic failover to the next account.
-- **Built-in web app** — React + shadcn/ui dashboard embedded in the single Go binary:
-  stats, mint timeline chart, account management, API keys.
+- **Built-in web app** — a passwordless, phone-paired dashboard embedded in the
+  single Go binary for account health and sharing controls.
 - **Rate limiting** — anonymous dispenses are limited per IP; API-key users are exempt.
 
 ## API
@@ -30,7 +29,7 @@ session tokens to compatible clients like [gplaydl](https://github.com/rehmatwor
 | `GET /api/auth` | Anonymous auth bundle `{email, auth}` from the public pool |
 | `POST /api/auth` | Full `AuthBundle` minted with the device config supplied in the body |
 | `GET /api/health` | Liveness probe |
-| `/api/v1/*` | Web app API (register, login, accounts CRUD, stats) |
+| `/api/v1/*` | App enrolment, phone pairing, account management, and stats |
 
 Query params for `/api/auth`:
 
@@ -62,7 +61,8 @@ go build -o dispenser ./cmd/dispenser
 set -a && source .env && set +a && ./dispenser
 ```
 
-Open http://localhost:8080, create a user, and add Google accounts.
+Open http://localhost:8080. Add accounts in the Android app, then use its
+one-time pairing code to open the web dashboard.
 
 ### Getting an AAS token
 
@@ -99,17 +99,14 @@ protoc --proto_path=proto --go_out=internal/pb --go_opt=paths=source_relative pr
 | `RESOURCES_DIR` | `resources` | Device `.properties` profiles |
 | `DEFAULT_DEVICE` | `arm64_xxhdpi` | Default device profile |
 | `SESSION_TTL_HOURS` | `336` | Web session lifetime |
-| `PUBLIC_URL` | `https://dispenser.gplaydl.com` | Base URL embedded in minted bundles and email links |
-| `BREVO_API_KEY` | — (optional) | Brevo API key for verification and password-reset emails; empty disables email flows (users auto-verified) |
-| `MAIL_FROM` | `no-reply@gplaydl.com` | Sender address (must be verified in Brevo) |
-| `MAIL_FROM_NAME` | `gplaydl dispenser` | Sender display name |
+| `PUBLIC_URL` | `https://dispenser.gplaydl.com` | Base URL embedded in minted bundles and pairing links |
 
 ## Architecture
 
 ```
 cmd/dispenser        entrypoint
 internal/config      env configuration
-internal/crypto      AES-GCM box, bcrypt, token hashing
+internal/crypto      AES-GCM box and token hashing
 internal/gplay       Google Play protocol (checkin → deviceConfig → auth → toc)
 internal/pb          generated protobuf (from proto/google_play.proto)
 internal/store       pgx pool, embedded migrations, rotation queries

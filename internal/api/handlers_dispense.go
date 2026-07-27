@@ -130,30 +130,17 @@ func (s *Server) dispense(r *http.Request, dc gplay.DeviceConfig, locale string)
 			continue
 		}
 
-		start := time.Now()
 		bundle, mintErr := s.gplay.Mint(ctx, gplay.Account{
 			Email:    account.Email,
 			AASToken: aasToken,
 		}, dc, locale)
-		duration := time.Since(start)
 
 		success := mintErr == nil
-		errMsg := ""
-		if mintErr != nil {
-			errMsg = mintErr.Error()
-		}
 
 		// Bookkeeping must not be cancelled along with the request.
 		bgCtx, bgCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		_ = s.store.RecordMintResult(bgCtx, account.ID, success)
-		_ = s.store.RecordMintEvent(bgCtx, store.MintEvent{
-			AccountID:  account.ID,
-			UserID:     ownerID,
-			Anonymous:  user == nil,
-			Success:    success,
-			Error:      errMsg,
-			DurationMS: int(duration.Milliseconds()),
-		})
+		_ = s.store.RecordMintOutcome(bgCtx, success)
 		bgCancel()
 
 		if mintErr == nil {

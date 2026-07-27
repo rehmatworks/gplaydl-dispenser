@@ -1,17 +1,8 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table"
 import { api, ApiError, type Account } from "@/lib/api"
-import { cn } from "@/lib/utils"
-import { FlaskConical, Globe2, Loader2, Lock, Trash2 } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Clock3, Globe2, Lock, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 
@@ -21,187 +12,141 @@ interface Props {
   onDelete: (id: string) => void
 }
 
-const statusStyles: Record<Account["status"], string> = {
-  active: "border-aurora-teal/40 bg-aurora-teal/10 text-aurora-teal",
-  flagged: "border-chart-4/40 bg-chart-4/10 text-chart-4",
-  disabled: "border-muted-foreground/30 bg-muted/40 text-muted-foreground"
+function relativeTime(value: string | null) {
+  if (!value) return "Not used yet"
+  const date = new Date(value)
+  const diff = Date.now() - date.getTime()
+  const minutes = Math.max(1, Math.round(diff / 60_000))
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.round(hours / 24)}d ago`
 }
 
 export function AccountsTable({ accounts, onChange, onDelete }: Props) {
-  const [testing, setTesting] = useState<string | null>(null)
+  const [updating, setUpdating] = useState<string | null>(null)
 
-  async function toggleVisibility(account: Account) {
-    const visibility = account.visibility === "public" ? "private" : "public"
+  async function setShared(account: Account, shared: boolean) {
+    setUpdating(account.id)
     try {
-      const res = await api.updateAccount(account.id, { visibility })
+      const res = await api.updateAccount(account.id, {
+        visibility: shared ? "public" : "private"
+      })
       onChange(res.account)
       toast.success(
-        visibility === "public"
-          ? `${account.email} is now shared with the community`
+        shared
+          ? `${account.email} is helping the community`
           : `${account.email} is now private`
       )
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Update failed")
-    }
-  }
-
-  async function toggleEnabled(account: Account) {
-    const status = account.status === "disabled" ? "active" : "disabled"
-    try {
-      const res = await api.updateAccount(account.id, { status })
-      onChange(res.account)
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Update failed")
-    }
-  }
-
-  async function test(account: Account) {
-    setTesting(account.id)
-    try {
-      const res = await api.testAccount(account.id)
-      if (res.success) {
-        toast.success(`${account.email} minted a token in ${(res.durationMs / 1000).toFixed(1)}s`)
-      } else {
-        toast.error(`${account.email} failed: ${res.error}`)
-      }
-      const refreshed = await api.accounts()
-      const updated = refreshed.accounts.find((a) => a.id === account.id)
-      if (updated) onChange(updated)
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Test failed")
+      toast.error(err instanceof ApiError ? err.message : "Could not update sharing")
     } finally {
-      setTesting(null)
+      setUpdating(null)
     }
   }
 
   async function remove(account: Account) {
-    if (!confirm(`Remove ${account.email} from the dispenser?`)) return
+    if (!confirm(`Remove ${account.email} from the dispenser? This cannot be undone.`)) return
     try {
       await api.deleteAccount(account.id)
       onDelete(account.id)
       toast.success(`${account.email} removed`)
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Delete failed")
+      toast.error(err instanceof ApiError ? err.message : "Could not remove account")
     }
   }
 
   if (accounts.length === 0) {
     return (
-      <div className="glass flex flex-col items-center rounded-2xl px-6 py-16 text-center">
-        <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-aurora-teal/15 to-aurora-violet/15 ring-1 ring-aurora-teal/20">
-          <Lock className="size-6 text-aurora-teal" />
+      <div className="glass flex flex-col items-center rounded-3xl px-6 py-14 text-center">
+        <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20">
+          <Lock className="size-6 text-primary" />
         </div>
-        <h3 className="font-display text-lg font-semibold">No Google accounts yet</h3>
-        <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-          Add your first account to start minting tokens. Keep it private, or share it with the
-          open-source community.
+        <h3 className="text-lg font-semibold">No Google accounts yet</h3>
+        <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+          Add an account in the gplaydl Authenticator app. It will appear here automatically.
         </p>
       </div>
     )
   }
 
   return (
-    <div className="glass overflow-hidden rounded-2xl">
-      <Table>
-        <TableHeader>
-          <TableRow className="border-border hover:bg-transparent">
-            <TableHead className="pl-5">Account</TableHead>
-            <TableHead>Pool</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Mints</TableHead>
-            <TableHead>Last used</TableHead>
-            <TableHead>Enabled</TableHead>
-            <TableHead className="pr-5 text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {accounts.map((account) => (
-            <TableRow key={account.id} className="border-border">
-              <TableCell className="pl-5">
-                <span className="mono-chip">{account.email}</span>
-                {account.source === "app" && (
-                  <span
-                    className="ml-2 text-xs text-muted-foreground"
-                    title="Synced from the Authenticator app"
-                  >
-                    via app
-                  </span>
-                )}
-                {account.failureCount > 0 && (
-                  <span className="ml-2 text-xs text-chart-4">
-                    {account.failureCount} fails
-                  </span>
-                )}
-              </TableCell>
-              <TableCell>
-                <button
-                  onClick={() => toggleVisibility(account)}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all",
-                    account.visibility === "public"
-                      ? "border-aurora-violet/40 bg-aurora-violet/10 text-aurora-pink hover:bg-aurora-violet/20"
-                      : "border-border bg-muted/40 text-muted-foreground hover:bg-muted/70"
-                  )}
-                  title="Click to toggle sharing"
-                >
-                  {account.visibility === "public" ? (
-                    <>
-                      <Globe2 className="size-3" /> Public
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="size-3" /> Private
-                    </>
-                  )}
-                </button>
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline" className={cn("rounded-full", statusStyles[account.status])}>
-                  {account.status}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-right font-mono text-sm">{account.mintCount}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {account.lastUsedAt ? new Date(account.lastUsedAt).toLocaleString() : "never"}
-              </TableCell>
-              <TableCell>
-                <Switch
-                  checked={account.status !== "disabled"}
-                  onCheckedChange={() => toggleEnabled(account)}
-                />
-              </TableCell>
-              <TableCell className="pr-5">
-                <div className="flex justify-end gap-1.5">
-                  <Button
+    <div className="grid gap-4 md:grid-cols-2">
+      {accounts.map((account) => {
+        const shared = account.visibility === "public"
+        const needsAttention = account.status !== "active" || account.failureCount >= 5
+        return (
+          <article key={account.id} className="glass card-hover rounded-3xl p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold">{account.email}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Badge
                     variant="outline"
-                    size="sm"
-                    onClick={() => test(account)}
-                    disabled={testing !== null}
-                    className="glass rounded-lg"
-                    title="Mint a test token with this account"
+                    className={
+                      needsAttention
+                        ? "rounded-full border-chart-4/40 bg-chart-4/10 text-chart-4"
+                        : "rounded-full border-primary/35 bg-primary/10 text-primary"
+                    }
                   >
-                    {testing === account.id ? (
-                      <Loader2 className="size-3.5 animate-spin" />
+                    {needsAttention ? (
+                      <AlertTriangle className="mr-1 size-3" />
                     ) : (
-                      <FlaskConical className="size-3.5" />
+                      <CheckCircle2 className="mr-1 size-3" />
                     )}
-                    Test
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => remove(account)}
-                    className="glass size-8 rounded-lg text-destructive hover:bg-destructive/10"
-                    title="Remove account"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
+                    {needsAttention ? "Needs sign-in" : "Healthy"}
+                  </Badge>
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock3 className="size-3" />
+                    {relativeTime(account.lastUsedAt)}
+                  </span>
                 </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Remove ${account.email}`}
+                onClick={() => remove(account)}
+                className="size-9 shrink-0 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+
+            {needsAttention && (
+              <div className="mt-4 rounded-2xl border border-chart-4/25 bg-chart-4/8 p-3 text-sm text-muted-foreground">
+                Open the Android app and add this account again to refresh its Google token.
+              </div>
+            )}
+
+            <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl bg-muted/35 p-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-background/55">
+                  {shared ? (
+                    <Globe2 className="size-4 text-primary" />
+                  ) : (
+                    <Lock className="size-4 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">
+                    {shared ? "Shared with community" : "Private to you"}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {shared ? `${account.mintCount} successful sessions` : "Never used anonymously"}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={shared}
+                disabled={updating === account.id}
+                onCheckedChange={(checked) => setShared(account, checked)}
+                aria-label={`Share ${account.email} with the community`}
+              />
+            </div>
+          </article>
+        )
+      })}
     </div>
   )
 }

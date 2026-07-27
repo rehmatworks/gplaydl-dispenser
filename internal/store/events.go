@@ -5,20 +5,30 @@ import (
 	"time"
 )
 
-type MintEvent struct {
-	AccountID  string
-	UserID     string
-	Anonymous  bool
-	Success    bool
-	Error      string
-	DurationMS int
-}
-
-func (s *Store) RecordMintEvent(ctx context.Context, e MintEvent) error {
+// RecordMintOutcome books a dispense against the hourly bucket and the
+// lifetime totals. Both are counter updates, so the tables stay a fixed size
+// no matter how many mints run through them.
+//
+// Per-account bookkeeping (mint_count, failure_count, flagging) is separate
+// and lives in RecordMintResult.
+func (s *Store) RecordMintOutcome(ctx context.Context, success bool) error {
+	ok, fail := 0, 1
+	if success {
+		ok, fail = 1, 0
+	}
+	// One round trip: this runs on the dispense path.
 	_, err := s.pool.Exec(ctx, `
-		INSERT INTO mint_events (account_id, user_id, anonymous, success, error, duration_ms)
-		VALUES (NULLIF($1, '')::uuid, NULLIF($2, '')::uuid, $3, $4, NULLIF($5, ''), $6)`,
-		e.AccountID, e.UserID, e.Anonymous, e.Success, e.Error, e.DurationMS)
+		WITH bump_totals AS (
+			UPDATE mint_totals
+			SET success = success + $1, failures = failures + $2
+			WHERE id
+		)
+		INSERT INTO mint_stats_hourly AS h (hour, success, failures)
+		VALUES (date_trunc('hour', now()), $1, $2)
+		ON CONFLICT (hour) DO UPDATE
+		SET success  = h.success + EXCLUDED.success,
+		    failures = h.failures + EXCLUDED.failures`,
+		ok, fail)
 	return err
 }
 
@@ -49,9 +59,11 @@ func (s *Store) Stats(ctx context.Context, ownerID string) (*PoolStats, error) {
 				AND ($1 = '' OR owner_id = $1::uuid)),
 			(SELECT count(*) FROM accounts WHERE status = 'flagged'
 				AND ($1 = '' OR owner_id = $1::uuid)),
-			(SELECT count(*) FROM mint_events WHERE success AND created_at > now() - interval '24 hours'),
-			(SELECT count(*) FROM mint_events WHERE NOT success AND created_at > now() - interval '24 hours'),
-			(SELECT coalesce(sum(mint_count), 0) FROM accounts),
+			(SELECT coalesce(sum(success), 0) FROM mint_stats_hourly
+				WHERE hour >= date_trunc('hour', now()) - interval '23 hours'),
+			(SELECT coalesce(sum(failures), 0) FROM mint_stats_hourly
+				WHERE hour >= date_trunc('hour', now()) - interval '23 hours'),
+			(SELECT coalesce(max(success), 0) FROM mint_totals),
 			(SELECT count(DISTINCT owner_id) FROM accounts WHERE visibility = 'public'),
 			(SELECT count(*) FROM accounts WHERE visibility = 'public'
 				AND ($1 = '' OR owner_id = $1::uuid))`,
@@ -73,19 +85,19 @@ type MintBucket struct {
 
 // MintTimeline returns hourly mint counts for the last 24 hours.
 func (s *Store) MintTimeline(ctx context.Context) ([]MintBucket, error) {
+	// generate_series keeps quiet hours in the result as explicit zeroes.
 	rows, err := s.pool.Query(ctx, `
 		SELECT
-			date_trunc('hour', h) AS hour,
-			coalesce(count(e.id) FILTER (WHERE e.success), 0),
-			coalesce(count(e.id) FILTER (WHERE NOT e.success), 0)
+			h AS hour,
+			coalesce(m.success, 0),
+			coalesce(m.failures, 0)
 		FROM generate_series(
 			date_trunc('hour', now()) - interval '23 hours',
 			date_trunc('hour', now()),
 			interval '1 hour'
 		) AS h
-		LEFT JOIN mint_events e
-			ON date_trunc('hour', e.created_at) = h
-		GROUP BY hour ORDER BY hour`)
+		LEFT JOIN mint_stats_hourly m ON m.hour = h
+		ORDER BY hour`)
 	if err != nil {
 		return nil, err
 	}
