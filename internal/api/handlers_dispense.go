@@ -191,7 +191,7 @@ func (s *Server) dispenseError(w http.ResponseWriter, err error) {
 	case errNoContribution:
 		writeError(w, http.StatusForbidden,
 			"your device has no shared account yet: open the Authenticator app and turn sharing on "+
-				"for a spare account, or pin one of your own accounts with ?email=")
+				"for a spare account, or pin one of your own accounts with --email")
 	default:
 		writeError(w, http.StatusBadGateway, err.Error())
 	}
