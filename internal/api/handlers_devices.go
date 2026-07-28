@@ -132,6 +132,49 @@ func (s *Server) handleClaimPairingCode(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
 }
 
+// handleClaimPairingCodeCLI is the same hand-off as handleClaimPairingCode,
+// but for gplaydl: instead of a browser session it mints a standalone API key
+// the CLI keeps on disk. Every machine claims its own code, so unlinking or
+// re-linking one never breaks another.
+func (s *Server) handleClaimPairingCodeCLI(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Code  string `json:"code"`
+		Label string `json:"label"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	code := strings.ToUpper(strings.NewReplacer(" ", "", "-", "").Replace(req.Code))
+	if code == "" {
+		writeError(w, http.StatusBadRequest, "missing pairing code")
+		return
+	}
+	req.Label = strings.TrimSpace(req.Label)
+	if len(req.Label) > 64 {
+		req.Label = req.Label[:64]
+	}
+	if req.Label == "" {
+		req.Label = "gplaydl"
+	}
+
+	userID, err := s.store.ConsumePairingCode(r.Context(), code)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "that pairing code is invalid or has expired")
+		return
+	}
+	apiKey, err := crypto.RandomToken(32)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not generate an API key")
+		return
+	}
+	if err := s.store.CreateAPIKey(r.Context(), userID, crypto.HashToken(apiKey), req.Label); err != nil {
+		s.log.Error("create api key", "err", err)
+		writeError(w, http.StatusInternalServerError, "could not store the API key")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"apiKey": apiKey})
+}
+
 // handleAppLatest advertises the current APK for the in-app update check and
 // the website download button.
 func (s *Server) handleAppLatest(w http.ResponseWriter, r *http.Request) {

@@ -19,6 +19,10 @@ const steps = [
     body: "The app asks before every sign-in whether the account joins the shared pool or stays private to you. Use a spare Google account, never your main one.",
   },
   {
+    title: "Link gplaydl with the pairing code",
+    body: "Run gplaydl link on your computer, open the Link screen in the app, and type the short code it shows. That is the whole setup.",
+  },
+  {
     title: "Change your mind whenever",
     body: "The account starts serving downloads right away. The Accounts screen in the app switches one back to private or deletes it.",
   },
@@ -39,7 +43,6 @@ export default function Landing() {
   }, [])
 
   const downloadUrl = release?.url || fallbackDownload
-  const origin = window.location.origin
 
   return (
     <div className="min-h-dvh overflow-hidden">
@@ -65,7 +68,8 @@ export default function Landing() {
         </h1>
         <p className="mt-3 leading-relaxed text-muted-foreground">
           Every Google Play login this dispenser hands out comes from a spare account
-          somebody shared. Adding one takes about a minute.
+          somebody shared. Sharing one is part of setting up gplaydl, and it takes
+          about a minute.
         </p>
 
         <section className="mt-10 grid gap-10 md:grid-cols-[1fr_auto]">
@@ -111,13 +115,20 @@ export default function Landing() {
         <section id="use" className="mt-16 scroll-mt-20 border-t border-border/60 pt-10">
           <h2 className="text-lg font-semibold">Using the pool</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Public accounts need no signup and no API key. Point any client that speaks the
-            dispenser API at this address.
+            gplaydl 3.0 and newer uses this dispenser out of the box. Link it once with
+            the pairing code from the app, and every download after that just works.
           </p>
+          <CommandBlock className="mt-5" command="gplaydl link" />
           <CommandBlock
-            className="mt-5"
-            command={`gplaydl download com.google.android.calculator -d ${origin}/api/auth`}
+            className="mt-3"
+            command="gplaydl download com.google.android.calculator"
           />
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+            To download apps tied to one of your own accounts, add that account in the
+            app as private and pass its address with{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">--email</code>. Private
+            accounts serve only you and never join the pool.
+          </p>
         </section>
 
         <section id="terms" className="mt-16 scroll-mt-20 border-t border-border/60 pt-10">

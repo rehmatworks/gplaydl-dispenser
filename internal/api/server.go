@@ -55,6 +55,8 @@ func (s *Server) Router() http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(s.authRateLimit())
 			r.Post("/pair/claim", s.handleClaimPairingCode)
+			// Same code, different prize: gplaydl gets an API key, not a session.
+			r.Post("/pair/claim-cli", s.handleClaimPairingCodeCLI)
 		})
 
 		// The Android app enrols itself here: no signup, no password.

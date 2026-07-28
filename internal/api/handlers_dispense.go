@@ -22,8 +22,15 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDispenseAnonymous mirrors GET /api/auth of the original dispenser:
-// returns {email, auth} minted with the default device profile.
+// returns {email, auth} minted with the default device profile. Like every
+// dispense it now requires a linked API key; only the response shape and the
+// borrowed account stay anonymous.
 func (s *Server) handleDispenseAnonymous(w http.ResponseWriter, r *http.Request) {
+	// Whether the caller may dispense at all comes before anything about how.
+	if userFrom(r.Context()) == nil {
+		s.dispenseError(w, errNeedsKey)
+		return
+	}
 	locale := queryDefault(r, "locale", "en")
 
 	dc, err := gplay.LoadDeviceConfig(s.cfg.ResourcesDir, queryDefault(r, "device", s.cfg.DefaultDevice))
@@ -46,6 +53,11 @@ func (s *Server) handleDispenseAnonymous(w http.ResponseWriter, r *http.Request)
 // handleDispenseWithConfig mirrors POST /api/auth: the caller supplies device
 // properties in the body and receives the full AuthBundle.
 func (s *Server) handleDispenseWithConfig(w http.ResponseWriter, r *http.Request) {
+	// Whether the caller may dispense at all comes before anything about how.
+	if userFrom(r.Context()) == nil {
+		s.dispenseError(w, errNeedsKey)
+		return
+	}
 	locale := queryDefault(r, "locale", "en")
 
 	var raw map[string]any
@@ -71,31 +83,38 @@ func (s *Server) handleDispenseWithConfig(w http.ResponseWriter, r *http.Request
 }
 
 var (
-	errNoAccounts    = fmt.Errorf("no accounts available")
-	errUnknownEmail  = fmt.Errorf("unknown account email")
-	errEmailNeedsKey = fmt.Errorf("email requires api key")
+	errNoAccounts     = fmt.Errorf("no accounts available")
+	errUnknownEmail   = fmt.Errorf("unknown account email")
+	errNeedsKey       = fmt.Errorf("api key required")
+	errNoContribution = fmt.Errorf("no shared account")
 )
 
 // dispense claims accounts from the rotation and attempts the handshake,
 // failing over to the next account (up to 3) on credential errors.
 //
-// Pinning to one account with ?email= is how a contributor reaches their own
-// purchased apps; everything else rotates least-recently-used.
+// Every dispense requires a linked API key, and drawing from the rotation
+// requires having put something into it: at least one public account. Pinning
+// to one of your own accounts with ?email= is exempt from the second rule,
+// because a pinned draw spends your own account's capacity, not the pool's.
 func (s *Server) dispense(r *http.Request, dc gplay.DeviceConfig, locale string) (*gplay.AuthBundle, error) {
 	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.MintTimeout)
 	defer cancel()
 
 	user := userFrom(r.Context())
+	if user == nil {
+		return nil, errNeedsKey
+	}
 	email := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("email")))
-	ownerID := ""
-	includePublic := true
-	if user != nil {
-		ownerID = user.ID
-		includePublic = queryDefault(r, "pool", "any") != "private"
-	} else if email != "" {
-		// Without a key we cannot tell whose account this is, and the community
-		// pool is not a place to look up other people's addresses.
-		return nil, errEmailNeedsKey
+	ownerID := user.ID
+	includePublic := queryDefault(r, "pool", "any") != "private"
+	if email == "" {
+		contributed, err := s.store.HasPublicAccount(ctx, ownerID)
+		if err != nil {
+			return nil, err
+		}
+		if !contributed {
+			return nil, errNoContribution
+		}
 	}
 
 	attempts := 3
@@ -165,9 +184,14 @@ func (s *Server) dispenseError(w http.ResponseWriter, err error) {
 	case errUnknownEmail:
 		writeError(w, http.StatusNotFound,
 			"that email is not one of your registered accounts")
-	case errEmailNeedsKey:
+	case errNeedsKey:
 		writeError(w, http.StatusUnauthorized,
-			"selecting an account by email requires your API key (add ?api_key=... to the dispenser URL)")
+			"this dispenser requires a linked device: install the Authenticator app from "+
+				s.cfg.PublicURL+", add a spare Google account, then run `gplaydl link` and enter the pairing code")
+	case errNoContribution:
+		writeError(w, http.StatusForbidden,
+			"your device has no shared account yet: open the Authenticator app and turn sharing on "+
+				"for a spare account, or pin one of your own accounts with ?email=")
 	default:
 		writeError(w, http.StatusBadGateway, err.Error())
 	}

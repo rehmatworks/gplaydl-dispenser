@@ -77,9 +77,25 @@ func (s *Store) UserByID(ctx context.Context, id string) (*User, error) {
 	return scanUser(s.pool.QueryRow(ctx, `SELECT `+userCols+` FROM users WHERE id = $1`, id))
 }
 
+// UserByAPIKeyHash resolves a key to its user, whether it is the app's own
+// enrolment key or one minted for a linked gplaydl install.
 func (s *Store) UserByAPIKeyHash(ctx context.Context, keyHash string) (*User, error) {
-	return scanUser(s.pool.QueryRow(ctx,
-		`SELECT `+userCols+` FROM users WHERE api_key_hash = $1`, keyHash))
+	return scanUser(s.pool.QueryRow(ctx, `
+		SELECT `+userCols+` FROM users WHERE api_key_hash = $1
+		UNION ALL
+		SELECT u.id, u.created_at, u.kind, coalesce(u.label, '')
+		FROM api_keys k JOIN users u ON u.id = k.user_id
+		WHERE k.key_hash = $1
+		LIMIT 1`, keyHash))
+}
+
+// CreateAPIKey stores an additional key for a user. These are the keys handed
+// to linked gplaydl installs; the app keeps its own on the users row.
+func (s *Store) CreateAPIKey(ctx context.Context, userID, keyHash, label string) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO api_keys (user_id, key_hash, label) VALUES ($1, $2, $3)`,
+		userID, keyHash, label)
+	return err
 }
 
 // TouchUser records app activity so the dashboard can show when a device last

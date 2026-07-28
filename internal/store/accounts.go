@@ -174,6 +174,19 @@ func (s *Store) NextAccountForEmail(ctx context.Context, ownerID, email string) 
 	return scanAccount(row)
 }
 
+// HasPublicAccount reports whether a user has put at least one account into
+// the community pool. Flagged accounts still count: they were contributed in
+// good faith and recover on the next successful mint. Disabled ones are dead.
+func (s *Store) HasPublicAccount(ctx context.Context, ownerID string) (bool, error) {
+	var ok bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM accounts
+			WHERE owner_id = $1 AND visibility = 'public' AND status <> 'disabled'
+		)`, ownerID).Scan(&ok)
+	return ok, err
+}
+
 const flagThreshold = 5
 
 // RecordMintResult updates rotation counters and auto-flags an account after
