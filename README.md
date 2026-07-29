@@ -2,44 +2,48 @@
 
 **Live instance: [dispenser.gplaydl.com](https://dispenser.gplaydl.com)**
 
-A small community-run login pool for open-source app store clients. Contributors share
-spare Google accounts (publicly or privately), and the service hands out anonymous
-session tokens to compatible clients like [gplaydl](https://github.com/rehmatworks/gplaydl).
+A small self-hostable login service for open-source app store clients. Each user adds
+their own Google accounts through the Android app, and the service mints Google Play
+session tokens from those accounts for that user's own [gplaydl](https://github.com/rehmatworks/gplaydl).
+Accounts are private to whoever added them; there is no shared pool.
 
 ## Features
 
-- **App-managed account pools** — Android contributors add Google accounts and choose
-  per account whether to share it with the community (`public`) or keep it private.
-- **Atomic LRU rotation in Postgres** — accounts are claimed with
+- **App-managed private accounts** — users add Google accounts in the Android app.
+  Every account is private to its owner and never handed to anyone else.
+- **Atomic LRU rotation in Postgres** — a user's accounts are claimed with
   `FOR UPDATE SKIP LOCKED`, so concurrent requests rotate through distinct accounts
   without contention. Rotation state survives restarts and works across replicas.
 - **Encrypted at rest** — AAS tokens are sealed with AES-256-GCM before storage.
-- **Self-healing pool** — accounts are auto-flagged after 5 consecutive failures and
-  drop out of rotation; a successful mint reactivates them.
+- **Self-healing** — accounts are auto-flagged after 5 consecutive failures and drop
+  out of rotation; a successful mint reactivates them.
 - **Concurrent minting** — bounded parallel handshakes, per-mint timeouts, and
-  automatic failover to the next account.
+  automatic failover to the caller's next account.
 - **Built-in web app** — a passwordless, phone-paired dashboard embedded in the
-  single Go binary for account health and sharing controls.
-- **Rate limiting** — anonymous dispenses are limited per IP; API-key users are exempt.
+  single Go binary for account health and management.
+- **Rate limiting** — unauthenticated requests are limited per IP; linked API-key
+  users are exempt.
 
 ## API
 
+Every dispense requires a linked API key; there is no anonymous minting.
+
 | Endpoint | Description |
 |---|---|
-| `GET /api/auth` | Anonymous auth bundle `{email, auth}` from the public pool |
+| `GET /api/auth` | Auth bundle `{email, auth}` from one of your own accounts |
 | `POST /api/auth` | Full `AuthBundle` minted with the device config supplied in the body |
 | `GET /api/health` | Liveness probe |
-| `/api/v1/*` | App enrolment, phone pairing, account management, and stats |
+| `/api/v1/*` | App enrolment, phone/CLI pairing, and account management |
 
 Query params for `/api/auth`:
 
 - `locale` — locale for the bundle (default `en`)
 - `device` — device profile name from `resources/` (GET only, default `arm64_xxhdpi`)
-- `pool=private` — restrict to your own accounts (requires API key)
+- `email` — pick a specific one of your accounts when you added several
 
-Authenticated dispensing: pass your API key as `X-Api-Key` header (or `api_key` query
-param). Authenticated requests draw from your private accounts *and* the public pool,
-and skip anonymous rate limits.
+Pass your API key as an `X-Api-Key` header (or `api_key` query param). With no `email`
+the dispenser rotates through your own accounts least-recently-used; API-key requests
+skip the per-IP rate limits.
 
 ## Quick start
 
@@ -61,8 +65,9 @@ go build -o dispenser ./cmd/dispenser
 set -a && source .env && set +a && ./dispenser
 ```
 
-Open http://localhost:8080. Add accounts in the Android app, then use its
-one-time pairing code to open the web dashboard.
+Open http://localhost:8080. Point the Android app's server setting at your instance,
+add accounts, then use its one-time pairing code to link gplaydl or open the web
+dashboard.
 
 ### Getting an AAS token
 
