@@ -21,15 +21,16 @@ import (
 	"gplaydl-dispenser/internal/store"
 )
 
-// The dispenser no longer serves strangers: every dispense needs a linked API
-// key, and drawing from the rotation needs at least one shared account behind
-// that key. These tests drive the whole journey over HTTP, from claiming a
-// pairing code as gplaydl would through each layer of refusal.
+// The dispenser only serves linked devices, and only ever hands back one of
+// the caller's own accounts: there is no public pool. These tests drive the
+// whole journey over HTTP, from claiming a pairing code as gplaydl would
+// through each layer of refusal.
 //
 // The gplay client is nil here, so a request that clears the gates stops at
 // the Play handshake. Corrupting the stored token makes that failure
 // deterministic (a 502 from the decrypt step), which is exactly the evidence
-// needed: 401 and 403 come from the gates, 502 means the rotation was reached.
+// needed: 401 means no key, 503 means no accounts, and 502 means one of the
+// caller's own accounts was reached.
 func TestDispenseEnforcement(t *testing.T) {
 	databaseURL := os.Getenv("TEST_DATABASE_URL")
 	if databaseURL == "" {
@@ -146,11 +147,14 @@ func TestDispenseEnforcement(t *testing.T) {
 
 	cliHeaders := map[string]string{"X-Api-Key": cliKey}
 
-	t.Run("a key with nothing behind it cannot draw from the pool", func(t *testing.T) {
+	t.Run("a key with no accounts cannot dispense", func(t *testing.T) {
 		res := performJSONRequest(router, http.MethodPost, "/api/auth",
 			`{"device":"test"}`, cliHeaders)
-		if res.Code != http.StatusForbidden {
-			t.Fatalf("no accounts: got %d, want 403: %s", res.Code, res.Body.String())
+		if res.Code != http.StatusServiceUnavailable {
+			t.Fatalf("no accounts: got %d, want 503: %s", res.Code, res.Body.String())
+		}
+		if !strings.Contains(res.Body.String(), "add a Google account") {
+			t.Fatalf("503 should tell the user to add an account: %s", res.Body.String())
 		}
 	})
 
@@ -158,35 +162,36 @@ func TestDispenseEnforcement(t *testing.T) {
 	// token so a dispense that reaches it fails at decrypt instead of hitting
 	// the nil Play client.
 	aas := "aas_et/" + strings.Repeat("x", 40)
-	private := performJSONRequest(router, http.MethodPost, "/api/v1/accounts",
-		`{"email":"own@example.test","aasToken":"`+aas+`","visibility":"private"}`,
+	created := performJSONRequest(router, http.MethodPost, "/api/v1/accounts",
+		`{"email":"own@example.test","aasToken":"`+aas+`"}`,
 		map[string]string{"X-Api-Key": deviceKey})
-	if private.Code != http.StatusCreated {
-		t.Fatalf("create private account: got %d: %s", private.Code, private.Body.String())
+	if created.Code != http.StatusCreated {
+		t.Fatalf("create account: got %d: %s", created.Code, created.Body.String())
 	}
 	if _, err := admin.Exec(ctx,
 		`UPDATE accounts SET aas_token_enc = 'garbage'::bytea`); err != nil {
 		t.Fatal(err)
 	}
 
-	t.Run("a private account alone does not open the pool", func(t *testing.T) {
+	t.Run("your own account is dispensed by default", func(t *testing.T) {
 		res := performJSONRequest(router, http.MethodPost, "/api/auth",
 			`{"device":"test"}`, cliHeaders)
-		if res.Code != http.StatusForbidden {
-			t.Fatalf("private only: got %d, want 403: %s", res.Code, res.Body.String())
-		}
-	})
-
-	t.Run("pinning your own private account is allowed", func(t *testing.T) {
-		res := performJSONRequest(router, http.MethodPost,
-			"/api/auth?email=own@example.test", `{"device":"test"}`, cliHeaders)
 		if res.Code != http.StatusBadGateway {
-			t.Fatalf("pinned draw should reach the rotation (502), got %d: %s",
+			t.Fatalf("own-account draw should reach the account (502), got %d: %s",
 				res.Code, res.Body.String())
 		}
 	})
 
-	t.Run("pinning somebody else's address is not", func(t *testing.T) {
+	t.Run("pinning your own account by email works", func(t *testing.T) {
+		res := performJSONRequest(router, http.MethodPost,
+			"/api/auth?email=own@example.test", `{"device":"test"}`, cliHeaders)
+		if res.Code != http.StatusBadGateway {
+			t.Fatalf("pinned draw should reach the account (502), got %d: %s",
+				res.Code, res.Body.String())
+		}
+	})
+
+	t.Run("pinning somebody else's address is refused", func(t *testing.T) {
 		res := performJSONRequest(router, http.MethodPost,
 			"/api/auth?email=stranger@example.test", `{"device":"test"}`, cliHeaders)
 		if res.Code != http.StatusNotFound {
@@ -194,22 +199,12 @@ func TestDispenseEnforcement(t *testing.T) {
 		}
 	})
 
-	t.Run("sharing an account opens the pool", func(t *testing.T) {
-		if _, err := admin.Exec(ctx, `
-			UPDATE accounts SET visibility = 'public', shared_at = now()
-			WHERE email = 'own@example.test'`); err != nil {
-			t.Fatal(err)
-		}
-		res := performJSONRequest(router, http.MethodPost, "/api/auth",
-			`{"device":"test"}`, cliHeaders)
-		if res.Code != http.StatusBadGateway {
-			t.Fatalf("contributed draw should reach the rotation (502), got %d: %s",
-				res.Code, res.Body.String())
-		}
-
-		get := performJSONRequest(router, http.MethodGet, "/api/auth", "", cliHeaders)
-		if get.Code != http.StatusBadGateway && get.Code != http.StatusBadRequest {
-			t.Fatalf("GET with key: got %d: %s", get.Code, get.Body.String())
+	t.Run("GET dispense is key-gated", func(t *testing.T) {
+		// The key check runs before the device profile is loaded, so this
+		// holds even though the test env ships no profile resources.
+		anon := performJSONRequest(router, http.MethodGet, "/api/auth", "", nil)
+		if anon.Code != http.StatusUnauthorized {
+			t.Fatalf("GET without key: got %d, want 401", anon.Code)
 		}
 	})
 }

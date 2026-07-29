@@ -1,14 +1,11 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
 import { api, ApiError, type Account } from "@/lib/api"
-import { AlertTriangle, CheckCircle2, Clock3, Globe2, Lock, Trash2 } from "lucide-react"
-import { useState } from "react"
+import { AlertTriangle, CheckCircle2, Clock3, Lock, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 interface Props {
   accounts: Account[]
-  onChange: (account: Account) => void
   onDelete: (id: string) => void
 }
 
@@ -23,28 +20,7 @@ function relativeTime(value: string | null) {
   return `${Math.round(hours / 24)}d ago`
 }
 
-export function AccountsTable({ accounts, onChange, onDelete }: Props) {
-  const [updating, setUpdating] = useState<string | null>(null)
-
-  async function setShared(account: Account, shared: boolean) {
-    setUpdating(account.id)
-    try {
-      const res = await api.updateAccount(account.id, {
-        visibility: shared ? "public" : "private"
-      })
-      onChange(res.account)
-      toast.success(
-        shared
-          ? `${account.email} is helping the community`
-          : `${account.email} is now private`
-      )
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Could not update sharing")
-    } finally {
-      setUpdating(null)
-    }
-  }
-
+export function AccountsTable({ accounts, onDelete }: Props) {
   async function remove(account: Account) {
     if (!confirm(`Remove ${account.email} from the dispenser? This cannot be undone.`)) return
     try {
@@ -73,7 +49,6 @@ export function AccountsTable({ accounts, onChange, onDelete }: Props) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {accounts.map((account) => {
-        const shared = account.visibility === "public"
         const needsAttention = account.status !== "active" || account.failureCount >= 5
         return (
           <article key={account.id} className="glass card-hover rounded-3xl p-5 sm:p-6">
@@ -119,30 +94,16 @@ export function AccountsTable({ accounts, onChange, onDelete }: Props) {
               </div>
             )}
 
-            <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl bg-muted/35 p-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-background/55">
-                  {shared ? (
-                    <Globe2 className="size-4 text-primary" />
-                  ) : (
-                    <Lock className="size-4 text-muted-foreground" />
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">
-                    {shared ? "Shared with community" : "Private to you"}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {shared ? `${account.mintCount} successful sessions` : "Never used anonymously"}
-                  </p>
-                </div>
+            <div className="mt-5 flex items-center gap-3 rounded-2xl bg-muted/35 p-4">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-background/55">
+                <Lock className="size-4 text-muted-foreground" />
               </div>
-              <Switch
-                checked={shared}
-                disabled={updating === account.id}
-                onCheckedChange={(checked) => setShared(account, checked)}
-                aria-label={`Share ${account.email} with the community`}
-              />
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Private to you</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {`${account.mintCount} downloads served`}
+                </p>
+              </div>
             </div>
           </article>
         )

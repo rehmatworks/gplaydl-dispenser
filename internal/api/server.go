@@ -79,13 +79,9 @@ func (s *Server) Router() http.Handler {
 
 			r.Get("/accounts", s.handleListAccounts)
 			r.Post("/accounts", s.handleCreateAccount)
-			r.Patch("/accounts/{id}", s.handleUpdateAccount)
 			r.Delete("/accounts/{id}", s.handleDeleteAccount)
 			r.Post("/accounts/{id}/test", s.handleTestAccount)
 
-			// Pool health is no longer rendered anywhere, so this is the only
-			// way to read it. It stays behind a session or API key.
-			r.Get("/stats", s.handleStats)
 			r.Get("/devices", s.handleDevices)
 		})
 

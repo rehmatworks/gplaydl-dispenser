@@ -10,8 +10,8 @@ import { useState } from "react"
 import { toast } from "sonner"
 
 /**
- * Opens the dashboard for a phone-enrolled contributor. They have no password,
- * so the app shows a one-shot code and this trades it for a session.
+ * Opens the dashboard for a phone-enrolled user. They have no password, so the
+ * app shows a one-shot code and this trades it for a session.
  */
 export default function Pair() {
   const { setUser } = useAuth()
@@ -46,7 +46,7 @@ export default function Pair() {
             </div>
             <CardTitle className="font-display text-2xl">Pair your phone</CardTitle>
             <p className="text-sm text-muted-foreground">
-              In the Authenticator app, tap the code icon in the top bar and type what it shows.
+              In the Authenticator app, open the Link gplaydl tab and type the code it shows.
             </p>
           </CardHeader>
           <CardContent className="p-6 pt-4">

@@ -22,9 +22,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDispenseAnonymous mirrors GET /api/auth of the original dispenser:
-// returns {email, auth} minted with the default device profile. Like every
-// dispense it now requires a linked API key; only the response shape and the
-// borrowed account stay anonymous.
+// returns {email, auth} minted with the default device profile. It still
+// requires a linked API key and serves only the caller's own accounts; the
+// name is kept for wire compatibility with the original endpoint.
 func (s *Server) handleDispenseAnonymous(w http.ResponseWriter, r *http.Request) {
 	// Whether the caller may dispense at all comes before anything about how.
 	if userFrom(r.Context()) == nil {
@@ -83,19 +83,17 @@ func (s *Server) handleDispenseWithConfig(w http.ResponseWriter, r *http.Request
 }
 
 var (
-	errNoAccounts     = fmt.Errorf("no accounts available")
-	errUnknownEmail   = fmt.Errorf("unknown account email")
-	errNeedsKey       = fmt.Errorf("api key required")
-	errNoContribution = fmt.Errorf("no shared account")
+	errNoAccounts   = fmt.Errorf("no accounts available")
+	errUnknownEmail = fmt.Errorf("unknown account email")
+	errNeedsKey     = fmt.Errorf("api key required")
 )
 
-// dispense claims accounts from the rotation and attempts the handshake,
-// failing over to the next account (up to 3) on credential errors.
+// dispense claims one of the caller's own accounts and attempts the handshake,
+// failing over to the next (up to 3) on credential errors.
 //
-// Every dispense requires a linked API key, and drawing from the rotation
-// requires having put something into it: at least one public account. Pinning
-// to one of your own accounts with ?email= is exempt from the second rule,
-// because a pinned draw spends your own account's capacity, not the pool's.
+// Every dispense requires a linked API key, and only ever draws from accounts
+// that key's owner added. With no --email it rotates over them least-recently
+// used; with --email it pins the one whose address matches.
 func (s *Server) dispense(r *http.Request, dc gplay.DeviceConfig, locale string) (*gplay.AuthBundle, error) {
 	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.MintTimeout)
 	defer cancel()
@@ -106,16 +104,6 @@ func (s *Server) dispense(r *http.Request, dc gplay.DeviceConfig, locale string)
 	}
 	email := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("email")))
 	ownerID := user.ID
-	includePublic := queryDefault(r, "pool", "any") != "private"
-	if email == "" {
-		contributed, err := s.store.HasPublicAccount(ctx, ownerID)
-		if err != nil {
-			return nil, err
-		}
-		if !contributed {
-			return nil, errNoContribution
-		}
-	}
 
 	attempts := 3
 	if email != "" {
@@ -133,7 +121,7 @@ func (s *Server) dispense(r *http.Request, dc gplay.DeviceConfig, locale string)
 				return nil, errUnknownEmail
 			}
 		} else {
-			account, err = s.store.NextAccount(ctx, ownerID, includePublic)
+			account, err = s.store.NextAccount(ctx, ownerID)
 		}
 		if err != nil {
 			if lastErr != nil {
@@ -180,33 +168,17 @@ func (s *Server) dispenseError(w http.ResponseWriter, err error) {
 	switch err {
 	case errNoAccounts:
 		writeError(w, http.StatusServiceUnavailable,
-			"the community pool is empty right now — share an account with the gplaydl Authenticator app to help out")
+			"no accounts on this device yet: add a Google account in the gplaydl Authenticator app")
 	case errUnknownEmail:
 		writeError(w, http.StatusNotFound,
 			"that email is not one of your registered accounts")
 	case errNeedsKey:
 		writeError(w, http.StatusUnauthorized,
 			"this dispenser requires a linked device: install the Authenticator app from "+
-				s.cfg.PublicURL+", add a spare Google account, then run `gplaydl link` and enter the pairing code")
-	case errNoContribution:
-		writeError(w, http.StatusForbidden,
-			"your device has no shared account yet: open the Authenticator app and turn sharing on "+
-				"for a spare account, or pin one of your own accounts with --email")
+				s.cfg.PublicURL+", add your Google account, then run `gplaydl link` and enter the pairing code")
 	default:
 		writeError(w, http.StatusBadGateway, err.Error())
 	}
-}
-
-// --- Stats ---
-
-func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
-	user := userFrom(r.Context())
-	stats, err := s.store.Stats(r.Context(), user.ID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "could not load stats")
-		return
-	}
-	writeJSON(w, http.StatusOK, stats)
 }
 
 func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {

@@ -41,33 +41,28 @@ func scanAccount(row interface{ Scan(...any) error }) (*Account, error) {
 //
 // A Google address exists once across the whole dispenser. Completing sign-in
 // proves control of it, so a sync from a different device takes the account
-// over rather than adding a second copy: the pool would otherwise count one
-// Google account as several, and every previous owner would keep a live token
-// for an address they may no longer control.
-func (s *Store) UpsertAccount(ctx context.Context, ownerID, email string, aasTokenEnc []byte, visibility, source, consentVersion string) (*Account, error) {
+// over rather than adding a second copy: one Google account would otherwise
+// appear as several, and every previous owner would keep a live token for an
+// address they may no longer control.
+//
+// Every account is private to its owner. The visibility column stays 'private'
+// for compatibility with the still-present schema.
+func (s *Store) UpsertAccount(ctx context.Context, ownerID, email string, aasTokenEnc []byte, source string) (*Account, error) {
 	row := s.pool.QueryRow(ctx, `
 		INSERT INTO accounts (owner_id, email, aas_token_enc, visibility, source,
-		                      consent_version, last_synced_at,
-		                      shared_at)
-		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), now(),
-		        CASE WHEN $4 = 'public' THEN now() END)
+		                      last_synced_at)
+		VALUES ($1, $2, $3, 'private', $4, now())
 		ON CONFLICT (email) DO UPDATE SET
 			owner_id        = EXCLUDED.owner_id,
 			aas_token_enc   = EXCLUDED.aas_token_enc,
-			visibility      = EXCLUDED.visibility,
 			source          = EXCLUDED.source,
-			consent_version = COALESCE(EXCLUDED.consent_version, accounts.consent_version),
 			-- a fresh token deserves a clean slate in the rotation
 			status          = 'active',
 			failure_count   = 0,
 			last_synced_at  = now(),
-			shared_at       = CASE
-				WHEN EXCLUDED.visibility = 'public' THEN COALESCE(accounts.shared_at, now())
-				ELSE NULL
-			END,
 			updated_at      = now()
 		RETURNING `+accountCols,
-		ownerID, email, aasTokenEnc, visibility, source, consentVersion)
+		ownerID, email, aasTokenEnc, source)
 	return scanAccount(row)
 }
 
@@ -98,25 +93,6 @@ func (s *Store) AccountByID(ctx context.Context, id, ownerID string) (*Account, 
 	return scanAccount(row)
 }
 
-func (s *Store) UpdateAccount(ctx context.Context, id, ownerID string, visibility *string, consentVersion string) (*Account, error) {
-	row := s.pool.QueryRow(ctx, `
-		UPDATE accounts SET
-			visibility = COALESCE($3, visibility),
-			consent_version = CASE
-				WHEN $3 = 'public' THEN NULLIF($4, '')
-				ELSE consent_version
-			END,
-			shared_at = CASE
-				WHEN COALESCE($3, visibility) = 'public' THEN COALESCE(shared_at, now())
-				ELSE NULL
-			END,
-			updated_at = now()
-		WHERE id = $1 AND owner_id = $2
-		RETURNING `+accountCols,
-		id, ownerID, visibility, consentVersion)
-	return scanAccount(row)
-}
-
 func (s *Store) DeleteAccount(ctx context.Context, id, ownerID string) error {
 	tag, err := s.pool.Exec(ctx,
 		`DELETE FROM accounts WHERE id = $1 AND owner_id = $2`, id, ownerID)
@@ -129,37 +105,30 @@ func (s *Store) DeleteAccount(ctx context.Context, id, ownerID string) error {
 	return nil
 }
 
-// NextAccount atomically claims the least-recently-used active account.
-// FOR UPDATE SKIP LOCKED makes concurrent dispenses pick distinct accounts
-// without blocking each other, and the rotation survives restarts.
+// NextAccount atomically claims the caller's least-recently-used active
+// account. FOR UPDATE SKIP LOCKED makes concurrent dispenses pick distinct
+// accounts without blocking each other, and the rotation survives restarts.
 //
-// pool semantics:
-//   - ownerID == ""  → public pool only (anonymous dispense)
-//   - ownerID != ""  → that user's own accounts, plus the public pool when
-//     includePublic is true
-func (s *Store) NextAccount(ctx context.Context, ownerID string, includePublic bool) (*Account, error) {
+// Every account is private to its owner, so a dispense only ever draws from
+// the accounts that owner added.
+func (s *Store) NextAccount(ctx context.Context, ownerID string) (*Account, error) {
 	row := s.pool.QueryRow(ctx, `
 		UPDATE accounts SET last_used_at = now(), updated_at = now()
 		WHERE id = (
 			SELECT id FROM accounts
-			WHERE status = 'active'
-			  AND (
-			        ($1 = '' AND visibility = 'public')
-			     OR ($1 <> '' AND owner_id = $1::uuid)
-			     OR ($1 <> '' AND $2 AND visibility = 'public')
-			  )
+			WHERE status = 'active' AND owner_id = $1::uuid
 			ORDER BY last_used_at ASC NULLS FIRST
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
 		)
 		RETURNING `+accountCols,
-		ownerID, includePublic)
+		ownerID)
 	return scanAccount(row)
 }
 
 // NextAccountForEmail claims one specific account of an owner, identified by
-// its Google address. This is how a contributor downloads their own purchased
-// apps: `?api_key=…&email=me@gmail.com` pins the rotation to that account.
+// its Google address. This is how someone with several accounts downloads as a
+// particular one: `--email me@gmail.com` pins the rotation to that account.
 func (s *Store) NextAccountForEmail(ctx context.Context, ownerID, email string) (*Account, error) {
 	row := s.pool.QueryRow(ctx, `
 		UPDATE accounts SET last_used_at = now(), updated_at = now()
@@ -172,19 +141,6 @@ func (s *Store) NextAccountForEmail(ctx context.Context, ownerID, email string) 
 		RETURNING `+accountCols,
 		ownerID, email)
 	return scanAccount(row)
-}
-
-// HasPublicAccount reports whether a user has put at least one account into
-// the community pool. Flagged accounts still count: they were contributed in
-// good faith and recover on the next successful mint. Disabled ones are dead.
-func (s *Store) HasPublicAccount(ctx context.Context, ownerID string) (bool, error) {
-	var ok bool
-	err := s.pool.QueryRow(ctx, `
-		SELECT EXISTS (
-			SELECT 1 FROM accounts
-			WHERE owner_id = $1 AND visibility = 'public' AND status <> 'disabled'
-		)`, ownerID).Scan(&ok)
-	return ok, err
 }
 
 const flagThreshold = 5

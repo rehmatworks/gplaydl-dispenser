@@ -4,7 +4,7 @@ import { Logo } from "@/components/Logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { api, type Account, type AppRelease } from "@/lib/api"
-import { AlertTriangle, Download, Globe2, LogOut, RefreshCw, ShieldCheck } from "lucide-react"
+import { AlertTriangle, Download, LogOut, RefreshCw, ShieldCheck } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
@@ -45,8 +45,6 @@ export default function Dashboard() {
     window.location.assign("/")
   }
 
-  const origin = window.location.origin
-  const shared = accounts.filter((account) => account.visibility === "public").length
   const needsAttention = accounts.filter(
     (account) => account.status !== "active" || account.failureCount >= 5
   ).length
@@ -80,8 +78,8 @@ export default function Dashboard() {
             <p className="text-sm font-medium text-primary">Paired with {user?.label || "Android app"}</p>
             <h1 className="mt-1 text-3xl font-bold">Google accounts</h1>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-              Sharing changes apply immediately to future Play sessions. Add or refresh accounts
-              in the Android app.
+              These accounts are private to you and power your own gplaydl downloads. Add or
+              refresh them in the Android app.
             </p>
           </div>
           <Button
@@ -107,10 +105,9 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           {[
             { icon: ShieldCheck, label: "Your accounts", value: loading ? "—" : accounts.length },
-            { icon: Globe2, label: "Shared by you", value: loading ? "—" : shared },
             {
               icon: AlertTriangle,
               label: "Need attention",
@@ -133,30 +130,28 @@ export default function Dashboard() {
 
         <AccountsTable
           accounts={accounts}
-          onChange={(updated) =>
-            setAccounts((current) =>
-              current.map((account) => (account.id === updated.id ? updated : account))
-            )
-          }
           onDelete={(id) => setAccounts((current) => current.filter((account) => account.id !== id))}
         />
 
         <details className="glass group rounded-3xl">
           <summary className="cursor-pointer list-none p-5 font-semibold sm:p-6">
-            Advanced: use gplaydl and update the app
+            Use gplaydl and update the app
             <span className="float-right text-muted-foreground transition-transform group-open:rotate-180">
               ↓
             </span>
           </summary>
           <div className="space-y-5 border-t border-border p-5 sm:p-6">
-            <CommandBlock
-              label="Community pool — no API key"
-              command={`gplaydl download com.google.android.calculator -d ${origin}/api/auth`}
-            />
             <p className="text-sm leading-relaxed text-muted-foreground">
-              For private accounts, copy the API key from the Android app and provide it through
-              gplaydl&apos;s API-key option. Never put it in a shared command or screenshot.
+              Link this account to gplaydl once with the pairing code from the app&apos;s Link
+              gplaydl screen, then download. Pass{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">--email</code> if you added several
+              accounts.
             </p>
+            <CommandBlock label="Link once" command="gplaydl link" />
+            <CommandBlock
+              label="Then download"
+              command="gplaydl download com.google.android.calculator"
+            />
             {release?.url && (
               <Button asChild variant="outline" className="glass rounded-xl">
                 <a href={release.url}>

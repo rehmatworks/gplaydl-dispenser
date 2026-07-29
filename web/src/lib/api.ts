@@ -9,14 +9,12 @@ export interface Account {
   id: string
   ownerId: string
   email: string
-  visibility: "public" | "private"
   status: "active" | "flagged" | "disabled"
   lastUsedAt: string | null
   failureCount: number
   mintCount: number
   createdAt: string
   source: "web" | "app"
-  sharedAt: string | null
   lastSyncedAt: string | null
 }
 
@@ -26,9 +24,6 @@ export interface AppRelease {
   url: string
   sha256: string
 }
-
-/** Must match CONSENT_VERSION in the Android app and the wording on this site. */
-export const CONSENT_VERSION = "2026-07-27"
 
 export class ApiError extends Error {
   status: number
@@ -58,15 +53,6 @@ export const api = {
   me: () => request<{ user: User }>("/api/v1/me"),
 
   accounts: () => request<{ accounts: Account[] }>("/api/v1/accounts"),
-
-  updateAccount: (id: string, patch: { visibility: "public" | "private" }) =>
-    request<{ account: Account }>(`/api/v1/accounts/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        ...patch,
-        ...(patch.visibility === "public" ? { consentVersion: CONSENT_VERSION } : {})
-      })
-    }),
 
   deleteAccount: (id: string) =>
     request<{ status: string }>(`/api/v1/accounts/${id}`, { method: "DELETE" }),

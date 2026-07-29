@@ -15,16 +15,16 @@ const steps = [
     body: "Android 7.0 or newer. It is not on Google Play, so Android will ask you to allow installs from this source.",
   },
   {
-    title: "Choose Community, then sign in",
-    body: "The app asks before every sign-in whether the account joins the shared pool or stays private to you. Use a spare Google account, never your main one.",
+    title: "Sign in with a Google account",
+    body: "Use a spare account rather than your main one. The account stays private to you; it is never shared with anyone else.",
   },
   {
     title: "Link gplaydl with the pairing code",
-    body: "Run gplaydl link on your computer, open the Link screen in the app, and type the short code it shows. That is the whole setup.",
+    body: "Run gplaydl link on your computer, open the Link gplaydl screen in the app, and type the short code it shows. That is the whole setup.",
   },
   {
-    title: "Change your mind whenever",
-    body: "The account starts serving downloads right away. The Accounts screen in the app switches one back to private or deletes it.",
+    title: "Download",
+    body: "gplaydl now downloads through your own account. Add several and pass --email to pick which one to use.",
   },
 ]
 
@@ -64,12 +64,11 @@ export default function Landing() {
 
       <main className="mx-auto max-w-4xl px-6 py-14">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-          Contribute a Google account
+          Use gplaydl with your own Google account
         </h1>
         <p className="mt-3 leading-relaxed text-muted-foreground">
-          Every Google Play login this dispenser hands out comes from a spare account
-          somebody shared. Sharing one is part of setting up gplaydl, and it takes
-          about a minute.
+          This dispenser mints Google Play tokens from accounts you add yourself. Your
+          accounts stay private to you, and setting up takes about two minutes.
         </p>
 
         <section className="mt-10 grid gap-10 md:grid-cols-[1fr_auto]">
@@ -113,9 +112,9 @@ export default function Landing() {
         </div>
 
         <section id="use" className="mt-16 scroll-mt-20 border-t border-border/60 pt-10">
-          <h2 className="text-lg font-semibold">Using the pool</h2>
+          <h2 className="text-lg font-semibold">Using gplaydl</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            gplaydl 3.0 and newer uses this dispenser out of the box. Link it once with
+            gplaydl 4.0 and newer uses this dispenser out of the box. Link it once with
             the pairing code from the app, and every download after that just works.
           </p>
           <CommandBlock className="mt-5" command="gplaydl link" />
@@ -124,44 +123,61 @@ export default function Landing() {
             command="gplaydl download com.google.android.calculator"
           />
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-            To download apps tied to one of your own accounts, add that account in the
-            app as private and pass its address with{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5">--email</code>. Private
-            accounts serve only you and never join the pool.
+            Added more than one account? Pass{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">--email you@gmail.com</code> to
+            download as a specific one. Otherwise gplaydl rotates through the accounts you
+            added.
+          </p>
+        </section>
+
+        <section id="selfhost" className="mt-16 scroll-mt-20 border-t border-border/60 pt-10">
+          <h2 className="text-lg font-semibold">Self-hosting</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            The dispenser is open source. Run your own for a team or just for yourself,
+            point the app&apos;s server setting at it, and link gplaydl with{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">gplaydl link -d https://your.dispenser</code>.
+          </p>
+          <p className="mt-3 text-sm leading-relaxed">
+            <a
+              className="text-primary hover:underline"
+              href="https://github.com/rehmatworks/gplaydl-dispenser"
+            >
+              github.com/rehmatworks/gplaydl-dispenser
+            </a>
           </p>
         </section>
 
         <section id="terms" className="mt-16 scroll-mt-20 border-t border-border/60 pt-10">
-          <h2 className="text-lg font-semibold">Sharing terms</h2>
+          <h2 className="text-lg font-semibold">Terms</h2>
           <dl className="mt-5 space-y-5 text-sm leading-relaxed">
             <div>
-              <dt className="font-medium">Contribute a spare account only</dt>
+              <dt className="font-medium">Use a spare account</dt>
               <dd className="mt-1 text-muted-foreground">
-                Never your primary, work, payment-linked, or purchased-app account. An AAS
+                Prefer a throwaway over your primary, work, or payment-linked account. An AAS
                 token can browse and download free Play apps as that account, and Google may
-                rate-limit, lock, or revoke accounts it sees on unofficial clients. Share
-                nothing you would mind losing.
+                rate-limit, lock, or revoke accounts it sees on unofficial clients.
               </dd>
             </div>
             <div>
-              <dt className="font-medium">Share only what is yours</dt>
+              <dt className="font-medium">Add only accounts that are yours</dt>
               <dd className="mt-1 text-muted-foreground">
-                Sign in with accounts you own and control. Do not upload someone else's
+                Sign in with accounts you own and control. Do not upload someone else&apos;s
                 credentials.
               </dd>
             </div>
             <div>
-              <dt className="font-medium">You can withdraw at any time</dt>
+              <dt className="font-medium">You can remove an account at any time</dt>
               <dd className="mt-1 text-muted-foreground">
-                Making an account private or deleting it stops all future dispensing. Play
-                sessions already handed out are short-lived, but they cannot be recalled.
+                Deleting an account in the app erases it from the dispenser and stops all
+                future dispensing. Play sessions already handed to your own gplaydl are
+                short-lived and expire on their own.
               </dd>
             </div>
             <div>
               <dt className="font-medium">No warranty</dt>
               <dd className="mt-1 text-muted-foreground">
-                This is a community-run, best-effort service with no uptime promise. It may
-                change or shut down, and it is not affiliated with Google.
+                This is a best-effort service with no uptime promise. It may change or shut
+                down, and it is not affiliated with Google. You can always self-host.
               </dd>
             </div>
           </dl>
@@ -187,18 +203,17 @@ export default function Landing() {
               </dd>
             </div>
             <div>
-              <dt className="font-medium">A public account address is public</dt>
+              <dt className="font-medium">Your accounts are yours alone</dt>
               <dd className="mt-1 text-muted-foreground">
-                Play needs both the address and the token, so the dispenser returns both to
-                whoever asks the pool for a login. Anyone using the pool can see the address
-                you contributed. This is exactly why it should be a throwaway one.
+                An account you add is only ever used to serve your own linked gplaydl. It is
+                never handed to anyone else and never appears in a shared pool.
               </dd>
             </div>
             <div>
               <dt className="font-medium">Logs</dt>
               <dd className="mt-1 text-muted-foreground">
                 IP addresses appear in short-lived server logs and in rate limiting. They are
-                never written to the database or tied to a contributed account.
+                never written to the database or tied to an account.
               </dd>
             </div>
             <div>
@@ -216,13 +231,16 @@ export default function Landing() {
         <Logo className="opacity-80" />
         <div className="flex flex-wrap gap-x-5 gap-y-2">
           <a href="/pair" className="whitespace-nowrap hover:text-foreground">
-            Pair dashboard
+            Dashboard
           </a>
           <a href={downloadUrl} className="whitespace-nowrap hover:text-foreground">
             Download app
           </a>
+          <a href="#selfhost" className="whitespace-nowrap hover:text-foreground">
+            Self-hosting
+          </a>
           <a href="#terms" className="whitespace-nowrap hover:text-foreground">
-            Sharing terms
+            Terms
           </a>
           <a href="#privacy" className="whitespace-nowrap hover:text-foreground">
             Privacy

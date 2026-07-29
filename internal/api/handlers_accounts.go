@@ -13,6 +13,8 @@ import (
 	"gplaydl-dispenser/internal/store"
 )
 
+// consentVersion is recorded when a device enrols, so the wording someone
+// agreed to when they first stored an account is kept on file.
 const currentConsentVersion = "2026-07-27"
 
 func (s *Server) handleListAccounts(w http.ResponseWriter, r *http.Request) {
@@ -27,17 +29,13 @@ func (s *Server) handleListAccounts(w http.ResponseWriter, r *http.Request) {
 }
 
 type createAccountRequest struct {
-	Email      string `json:"email"`
-	AASToken   string `json:"aasToken"`
-	Visibility string `json:"visibility"`
-	// ConsentVersion records which wording the contributor agreed to when they
-	// chose to share the account with the community.
-	ConsentVersion string `json:"consentVersion"`
+	Email    string `json:"email"`
+	AASToken string `json:"aasToken"`
 }
 
-// handleCreateAccount registers or refreshes a Google account. The Android app
-// re-syncs the same address whenever it mints a new token, so this is an upsert
-// rather than a plain insert.
+// handleCreateAccount registers or refreshes a Google account, always private
+// to its owner. The Android app re-syncs the same address whenever it mints a
+// new token, so this is an upsert rather than a plain insert.
 func (s *Server) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 	user := userFrom(r.Context())
 
@@ -56,13 +54,6 @@ func (s *Server) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "AAS token looks invalid (should start with aas_et/)")
 		return
 	}
-	if req.Visibility != "public" && req.Visibility != "private" {
-		req.Visibility = "private"
-	}
-	if req.Visibility == "public" && req.ConsentVersion != currentConsentVersion {
-		writeError(w, http.StatusBadRequest, "accept the current sharing terms before making this account public")
-		return
-	}
 
 	enc, err := s.box.Encrypt(req.AASToken)
 	if err != nil {
@@ -70,52 +61,13 @@ func (s *Server) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account, err := s.store.UpsertAccount(r.Context(), user.ID, req.Email, enc,
-		req.Visibility, "app", req.ConsentVersion)
+	account, err := s.store.UpsertAccount(r.Context(), user.ID, req.Email, enc, "app")
 	if err != nil {
 		s.log.Error("save account", "err", err)
 		writeError(w, http.StatusInternalServerError, "could not save account")
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"account": account})
-}
-
-type updateAccountRequest struct {
-	Visibility     *string `json:"visibility"`
-	ConsentVersion string  `json:"consentVersion"`
-}
-
-func (s *Server) handleUpdateAccount(w http.ResponseWriter, r *http.Request) {
-	user := userFrom(r.Context())
-
-	var req updateAccountRequest
-	if !readJSON(w, r, &req) {
-		return
-	}
-	if req.Visibility != nil && *req.Visibility != "public" && *req.Visibility != "private" {
-		writeError(w, http.StatusBadRequest, "visibility must be public or private")
-		return
-	}
-	if req.Visibility != nil && *req.Visibility == "public" && req.ConsentVersion != currentConsentVersion {
-		writeError(w, http.StatusBadRequest, "accept the current sharing terms before making this account public")
-		return
-	}
-	account, err := s.store.UpdateAccount(
-		r.Context(),
-		chi.URLParam(r, "id"),
-		user.ID,
-		req.Visibility,
-		req.ConsentVersion,
-	)
-	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			writeError(w, http.StatusNotFound, "account not found")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "could not update account")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"account": account})
 }
 
 func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
@@ -133,7 +85,7 @@ func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleTestAccount runs a real mint against a specific account so users can
-// verify their credentials work before sharing them with the pool.
+// verify their credentials work.
 func (s *Server) handleTestAccount(w http.ResponseWriter, r *http.Request) {
 	user := userFrom(r.Context())
 

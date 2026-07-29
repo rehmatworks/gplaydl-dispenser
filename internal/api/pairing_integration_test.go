@@ -152,69 +152,38 @@ func TestPairingOnlyAPI(t *testing.T) {
 		}
 	})
 
-	t.Run("public visibility requires current consent", func(t *testing.T) {
+	t.Run("accounts are always private and cannot be made public", func(t *testing.T) {
 		headers := map[string]string{"X-Api-Key": apiKey}
 		token := "aas_et/" + strings.Repeat("x", 40)
 
-		publicWithoutConsent := performJSONRequest(
+		created := performJSONRequest(
 			router,
 			http.MethodPost,
 			"/api/v1/accounts",
-			`{"email":"spare@example.test","aasToken":"`+token+`","visibility":"public"}`,
+			`{"email":"spare@example.test","aasToken":"`+token+`"}`,
 			headers,
 		)
-		if publicWithoutConsent.Code != http.StatusBadRequest {
-			t.Fatalf("public without consent: got %d", publicWithoutConsent.Code)
+		if created.Code != http.StatusCreated {
+			t.Fatalf("create account: got %d: %s", created.Code, created.Body.String())
 		}
-
-		private := performJSONRequest(
-			router,
-			http.MethodPost,
-			"/api/v1/accounts",
-			`{"email":"spare@example.test","aasToken":"`+token+`","visibility":"private"}`,
-			headers,
-		)
-		if private.Code != http.StatusCreated {
-			t.Fatalf("create private: got %d: %s", private.Code, private.Body.String())
+		if !strings.Contains(created.Body.String(), `"visibility":"private"`) {
+			t.Fatalf("new account should be private: %s", created.Body.String())
 		}
 		account, err := st.AccountsByOwner(ctx, user.ID)
 		if err != nil || len(account) != 1 {
-			t.Fatalf("load private account: %v, count %d", err, len(account))
+			t.Fatalf("load account: %v, count %d", err, len(account))
 		}
 
-		publicWithoutConsent = performJSONRequest(
+		// There is no longer any endpoint that could turn an account public.
+		patch := performJSONRequest(
 			router,
 			http.MethodPatch,
 			"/api/v1/accounts/"+account[0].ID,
 			`{"visibility":"public"}`,
 			headers,
 		)
-		if publicWithoutConsent.Code != http.StatusBadRequest {
-			t.Fatalf("publish without consent: got %d", publicWithoutConsent.Code)
-		}
-
-		publish := performJSONRequest(
-			router,
-			http.MethodPatch,
-			"/api/v1/accounts/"+account[0].ID,
-			`{"visibility":"public","consentVersion":"`+currentConsentVersion+`"}`,
-			headers,
-		)
-		if publish.Code != http.StatusOK ||
-			!strings.Contains(publish.Body.String(), `"visibility":"public"`) {
-			t.Fatalf("publish with consent: got %d: %s", publish.Code, publish.Body.String())
-		}
-
-		makePrivate := performJSONRequest(
-			router,
-			http.MethodPatch,
-			"/api/v1/accounts/"+account[0].ID,
-			`{"visibility":"private"}`,
-			headers,
-		)
-		if makePrivate.Code != http.StatusOK ||
-			!strings.Contains(makePrivate.Body.String(), `"visibility":"private"`) {
-			t.Fatalf("make private: got %d: %s", makePrivate.Code, makePrivate.Body.String())
+		if patch.Code != http.StatusMethodNotAllowed && patch.Code != http.StatusNotFound {
+			t.Fatalf("PATCH should be gone: got %d", patch.Code)
 		}
 	})
 
