@@ -3,6 +3,7 @@ import { Logo } from "@/components/Logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { api, type AppRelease } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 import { Download, Smartphone } from "lucide-react"
 import { useEffect, useState } from "react"
 import { QRCodeSVG } from "qrcode.react"
@@ -29,6 +30,7 @@ const steps = [
 ]
 
 export default function Landing() {
+  const { user, loading } = useAuth()
   const [release, setRelease] = useState<AppRelease | null>(null)
 
   useEffect(() => {
@@ -43,6 +45,9 @@ export default function Landing() {
   }, [])
 
   const downloadUrl = release?.url || fallbackDownload
+  // Prefer the protected dashboard while auth is still loading. It will
+  // redirect unauthenticated visitors to pairing once the session check ends.
+  const dashboardHref = loading || user ? "/dashboard" : "/pair"
 
   return (
     <div className="min-h-dvh overflow-hidden">
@@ -54,7 +59,7 @@ export default function Landing() {
             <Logo />
           </a>
           <Button asChild variant="outline" size="sm" className="glass rounded-xl">
-            <a href="/pair">
+            <a href={dashboardHref}>
               <Smartphone className="size-4" />
               Dashboard
             </a>
@@ -230,7 +235,7 @@ export default function Landing() {
       <footer className="mx-auto flex max-w-4xl flex-col gap-4 border-t border-border/60 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <Logo className="opacity-80" />
         <div className="flex flex-wrap gap-x-5 gap-y-2">
-          <a href="/pair" className="whitespace-nowrap hover:text-foreground">
+          <a href={dashboardHref} className="whitespace-nowrap hover:text-foreground">
             Dashboard
           </a>
           <a href={downloadUrl} className="whitespace-nowrap hover:text-foreground">

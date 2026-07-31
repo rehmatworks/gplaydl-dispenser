@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { api, ApiError } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { Smartphone } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 /**
@@ -14,9 +14,13 @@ import { toast } from "sonner"
  * app shows a one-shot code and this trades it for a session.
  */
 export default function Pair() {
-  const { setUser } = useAuth()
+  const { user, loading, setUser } = useAuth()
   const [code, setCode] = useState("")
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!loading && user) window.location.replace("/dashboard")
+  }, [loading, user])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -30,6 +34,14 @@ export default function Pair() {
     } finally {
       setBusy(false)
     }
+  }
+
+  if (loading || user) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    )
   }
 
   return (
