@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"io/fs"
 	"log/slog"
@@ -14,20 +15,29 @@ import (
 	"gplaydl-dispenser/internal/config"
 	"gplaydl-dispenser/internal/crypto"
 	"gplaydl-dispenser/internal/gplay"
+	proxycfg "gplaydl-dispenser/internal/proxy"
 	"gplaydl-dispenser/internal/store"
 )
 
 type Server struct {
-	cfg    *config.Config
-	store  *store.Store
-	box    *crypto.Box
-	gplay  *gplay.Client
-	log    *slog.Logger
-	static fs.FS
+	cfg        *config.Config
+	store      *store.Store
+	box        *crypto.Box
+	gplay      playMinter
+	probeProxy func(context.Context, string) error
+	log        *slog.Logger
+	static     fs.FS
 }
 
-func NewServer(cfg *config.Config, st *store.Store, box *crypto.Box, gp *gplay.Client, static fs.FS, log *slog.Logger) *Server {
-	return &Server{cfg: cfg, store: st, box: box, gplay: gp, static: static, log: log}
+type playMinter interface {
+	Mint(context.Context, gplay.Account, gplay.DeviceConfig, string, string) (*gplay.AuthBundle, error)
+}
+
+func NewServer(cfg *config.Config, st *store.Store, box *crypto.Box, gp playMinter, static fs.FS, log *slog.Logger) *Server {
+	return &Server{
+		cfg: cfg, store: st, box: box, gplay: gp, probeProxy: proxycfg.Probe,
+		static: static, log: log,
+	}
 }
 
 func (s *Server) Router() http.Handler {
@@ -69,6 +79,15 @@ func (s *Server) Router() http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireSession)
 			r.Post("/logout", s.handleLogout)
+		})
+
+		// Server-wide settings require a browser session whose user was
+		// explicitly promoted by a database administrator.
+		r.Group(func(r chi.Router) {
+			r.Use(s.requireAdmin)
+			r.Get("/admin/settings", s.handleAdminSettings)
+			r.Put("/admin/settings/proxy", s.handleSetProxyTemplate)
+			r.Delete("/admin/settings/proxy", s.handleClearProxyTemplate)
 		})
 
 		// Shared by the dashboard (session cookie) and the app (API key).

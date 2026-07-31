@@ -1,5 +1,10 @@
 package gplay
 
+import (
+	"errors"
+	"fmt"
+)
+
 // AuthBundle is the response shape gplaydl-compatible clients expect.
 // Field names intentionally match the original NodeJS dispenser.
 type AuthBundle struct {
@@ -65,4 +70,20 @@ func anonymousProfile() UserProfile {
 type Account struct {
 	Email    string
 	AASToken string
+}
+
+// CredentialError means Google rejected the account itself. Retrying through
+// another network path cannot repair it and would unnecessarily expose the
+// server's direct IP.
+type CredentialError struct {
+	Code string
+}
+
+func (e *CredentialError) Error() string {
+	return fmt.Sprintf("google rejected credentials: %s", e.Code)
+}
+
+func IsCredentialError(err error) bool {
+	var credentialErr *CredentialError
+	return errors.As(err, &credentialErr)
 }

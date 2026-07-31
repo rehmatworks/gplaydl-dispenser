@@ -3,6 +3,7 @@ export interface User {
   createdAt: string
   kind: "device"
   label: string
+  isAdmin: boolean
 }
 
 export interface Account {
@@ -16,6 +17,11 @@ export interface Account {
   createdAt: string
   source: "web" | "app"
   lastSyncedAt: string | null
+  proxyConfigured: boolean
+  proxyTestStatus?: "passed" | "failed"
+  proxyTestedAt?: string
+  proxyFailureCount: number
+  lastProxyFailureAt?: string
 }
 
 export interface AppRelease {
@@ -23,6 +29,10 @@ export interface AppRelease {
   versionCode: number
   url: string
   sha256: string
+}
+
+export interface ProxySettings {
+  proxyConfigured: boolean
 }
 
 export class ApiError extends Error {
@@ -58,6 +68,19 @@ export const api = {
     request<{ status: string }>(`/api/v1/accounts/${id}`, { method: "DELETE" }),
 
   appLatest: () => request<AppRelease>("/api/v1/app/latest"),
+
+  adminSettings: () => request<ProxySettings>("/api/v1/admin/settings"),
+
+  updateProxy: (proxyTemplate: string) =>
+    request<ProxySettings>("/api/v1/admin/settings/proxy", {
+      method: "PUT",
+      body: JSON.stringify({ proxyTemplate })
+    }),
+
+  clearProxy: () =>
+    request<ProxySettings>("/api/v1/admin/settings/proxy", {
+      method: "DELETE"
+    }),
 
   /** Trades a code shown by the Android app for a browser session. */
   claimPairing: (code: string) =>

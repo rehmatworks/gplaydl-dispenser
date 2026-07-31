@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -42,7 +43,9 @@ func TestPairingOnlyAPI(t *testing.T) {
 	_, err = admin.Exec(ctx, `
 		TRUNCATE pairing_codes, mint_events, mint_stats_hourly, mint_totals,
 		         accounts, sessions, email_tokens, users
-		RESTART IDENTITY CASCADE`)
+		RESTART IDENTITY CASCADE;
+		UPDATE admin_settings SET proxy_template_enc = NULL, updated_at = now()
+		WHERE singleton = true`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,6 +133,43 @@ func TestPairingOnlyAPI(t *testing.T) {
 		}
 	})
 
+	t.Run("admin settings require explicit database promotion", func(t *testing.T) {
+		token := "admin-settings-session"
+		if err := st.CreateSession(ctx, crypto.HashToken(token), user.ID, time.Minute); err != nil {
+			t.Fatal(err)
+		}
+		cookie := &http.Cookie{Name: sessionCookie, Value: token}
+
+		settings := performRequest(router, http.MethodGet, "/api/v1/admin/settings", "", cookie)
+		if settings.Code != http.StatusForbidden {
+			t.Fatalf("non-admin settings: got %d, want 403", settings.Code)
+		}
+
+		if _, err := admin.Exec(ctx, `UPDATE users SET is_admin = true WHERE id = $1`, user.ID); err != nil {
+			t.Fatal(err)
+		}
+		template := `http://username:password@example.com:{rand_int:10001-49000}`
+		save := performRequest(router, http.MethodPut, "/api/v1/admin/settings/proxy",
+			`{"proxyTemplate":"`+template+`"}`, cookie)
+		if save.Code != http.StatusOK || !strings.Contains(save.Body.String(), `"proxyConfigured":true`) {
+			t.Fatalf("save proxy setting: got %d: %s", save.Code, save.Body.String())
+		}
+
+		var encrypted []byte
+		if err := admin.QueryRow(ctx,
+			`SELECT proxy_template_enc FROM admin_settings WHERE singleton = true`).Scan(&encrypted); err != nil {
+			t.Fatal(err)
+		}
+		if len(encrypted) == 0 || bytes.Contains(encrypted, []byte("password")) {
+			t.Fatal("proxy template was not stored as encrypted ciphertext")
+		}
+
+		clear := performRequest(router, http.MethodDelete, "/api/v1/admin/settings/proxy", "", cookie)
+		if clear.Code != http.StatusOK || !strings.Contains(clear.Body.String(), `"proxyConfigured":false`) {
+			t.Fatalf("clear proxy setting: got %d: %s", clear.Code, clear.Body.String())
+		}
+	})
+
 	t.Run("legacy web sessions cannot open the dashboard", func(t *testing.T) {
 		var legacyID string
 		err := admin.QueryRow(ctx, `
@@ -149,6 +189,92 @@ func TestPairingOnlyAPI(t *testing.T) {
 		me := performRequest(router, http.MethodGet, "/api/v1/me", "", cookie)
 		if me.Code != http.StatusUnauthorized {
 			t.Fatalf("legacy session: got %d, want 401", me.Code)
+		}
+	})
+
+	t.Run("failed proxy probe is saved and assignment is preserved", func(t *testing.T) {
+		template := "http://user:password@proxy.example:{rand_int:12345-12345}"
+		encryptedTemplate, err := box.Encrypt(template)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := st.SetProxyTemplate(ctx, encryptedTemplate); err != nil {
+			t.Fatal(err)
+		}
+		originalProbe := server.probeProxy
+		server.probeProxy = func(context.Context, string) error {
+			return errors.New("test proxy unavailable")
+		}
+		defer func() {
+			server.probeProxy = originalProbe
+			_ = st.ClearProxyTemplate(ctx)
+		}()
+
+		headers := map[string]string{"X-Api-Key": apiKey}
+		token := "aas_et/" + strings.Repeat("p", 40)
+		create := func() *httptest.ResponseRecorder {
+			return performJSONRequest(router, http.MethodPost, "/api/v1/accounts",
+				`{"email":"proxy@example.test","aasToken":"`+token+`"}`, headers)
+		}
+		created := create()
+		if created.Code != http.StatusCreated ||
+			!strings.Contains(created.Body.String(), `"proxyConfigured":true`) ||
+			!strings.Contains(created.Body.String(), `"proxyTestStatus":"failed"`) ||
+			!strings.Contains(created.Body.String(), `"proxyWarning"`) {
+			t.Fatalf("proxied account response: got %d: %s", created.Code, created.Body.String())
+		}
+
+		accounts, err := st.AccountsByOwner(ctx, user.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var assigned *store.Account
+		for _, account := range accounts {
+			if account.Email == "proxy@example.test" {
+				assigned = account
+			}
+		}
+		if assigned == nil {
+			t.Fatal("proxied account was not stored")
+		}
+		firstURL, err := box.Decrypt(assigned.ProxyURLEnc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if firstURL != "http://user:password@proxy.example:12345" {
+			t.Fatalf("assigned proxy = %q", firstURL)
+		}
+		if assigned.ProxyFailureCount != 1 || assigned.LastProxyFailureAt == nil {
+			t.Fatalf("initial proxy failure state = count %d, at %v",
+				assigned.ProxyFailureCount, assigned.LastProxyFailureAt)
+		}
+		if count, err := st.RecordProxyResult(ctx, assigned.ID, false); err != nil || count != 2 {
+			t.Fatalf("record second proxy failure: count %d, err %v", count, err)
+		}
+		if count, err := st.RecordProxyResult(ctx, assigned.ID, true); err != nil || count != 0 {
+			t.Fatalf("reset proxy failures: count %d, err %v", count, err)
+		}
+
+		if refreshed := create(); refreshed.Code != http.StatusCreated {
+			t.Fatalf("refresh account: got %d: %s", refreshed.Code, refreshed.Body.String())
+		}
+		reloaded, err := st.AccountByID(ctx, assigned.ID, user.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		secondURL, err := box.Decrypt(reloaded.ProxyURLEnc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if secondURL != firstURL {
+			t.Fatalf("proxy changed on refresh: %q -> %q", firstURL, secondURL)
+		}
+		if reloaded.ProxyFailureCount != 0 || reloaded.ProxyTestStatus != "passed" {
+			t.Fatalf("proxy success did not reset health: count %d, status %q",
+				reloaded.ProxyFailureCount, reloaded.ProxyTestStatus)
+		}
+		if err := st.DeleteAccount(ctx, assigned.ID, user.ID); err != nil {
+			t.Fatal(err)
 		}
 	})
 

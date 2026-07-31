@@ -4,7 +4,7 @@ import { Logo } from "@/components/Logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { api, type Account, type AppRelease } from "@/lib/api"
-import { AlertTriangle, Download, LogOut, RefreshCw, ShieldCheck } from "lucide-react"
+import { AlertTriangle, Download, LogOut, RefreshCw, Settings2, ShieldCheck } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
@@ -46,7 +46,10 @@ export default function Dashboard() {
   }
 
   const needsAttention = accounts.filter(
-    (account) => account.status !== "active" || account.failureCount >= 5
+    (account) =>
+      account.status !== "active" ||
+      account.failureCount >= 5 ||
+      (account.proxyConfigured && account.proxyTestStatus === "failed")
   ).length
 
   return (
@@ -58,6 +61,14 @@ export default function Dashboard() {
           </a>
           <div className="flex items-center gap-2">
             <span className="hidden text-sm text-muted-foreground sm:block">{user?.label}</span>
+            {user?.isAdmin && (
+              <Button asChild variant="ghost" size="sm" className="rounded-xl">
+                <a href="/admin/settings">
+                  <Settings2 className="size-4" />
+                  <span className="hidden sm:inline">Settings</span>
+                </a>
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"

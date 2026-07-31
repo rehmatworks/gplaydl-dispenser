@@ -52,7 +52,9 @@ func TestDispenseEnforcement(t *testing.T) {
 	_, err = admin.Exec(ctx, `
 		TRUNCATE api_keys, pairing_codes, mint_events, mint_stats_hourly,
 		         mint_totals, accounts, sessions, email_tokens, users
-		RESTART IDENTITY CASCADE`)
+		RESTART IDENTITY CASCADE;
+		UPDATE admin_settings SET proxy_template_enc = NULL, updated_at = now()
+		WHERE singleton = true`)
 	if err != nil {
 		t.Fatal(err)
 	}

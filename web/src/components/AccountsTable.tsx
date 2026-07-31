@@ -49,7 +49,9 @@ export function AccountsTable({ accounts, onDelete }: Props) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {accounts.map((account) => {
-        const needsAttention = account.status !== "active" || account.failureCount >= 5
+        const proxyFailed = account.proxyConfigured && account.proxyTestStatus === "failed"
+        const credentialFailed = account.status !== "active" || account.failureCount >= 5
+        const needsAttention = credentialFailed || proxyFailed
         return (
           <article key={account.id} className="glass card-hover rounded-3xl p-5 sm:p-6">
             <div className="flex items-start justify-between gap-4">
@@ -69,7 +71,7 @@ export function AccountsTable({ accounts, onDelete }: Props) {
                     ) : (
                       <CheckCircle2 className="mr-1 size-3" />
                     )}
-                    {needsAttention ? "Needs sign-in" : "Healthy"}
+                    {proxyFailed ? "Proxy check failed" : credentialFailed ? "Needs sign-in" : "Healthy"}
                   </Badge>
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Clock3 className="size-3" />
@@ -90,7 +92,11 @@ export function AccountsTable({ accounts, onDelete }: Props) {
 
             {needsAttention && (
               <div className="mt-4 rounded-2xl border border-chart-4/25 bg-chart-4/8 p-3 text-sm text-muted-foreground">
-                Open the Android app and add this account again to refresh its Google token.
+                {proxyFailed
+                  ? `The assigned proxy has ${account.proxyFailureCount} consecutive connection ${
+                      account.proxyFailureCount === 1 ? "failure" : "failures"
+                    }. Token minting will retry it before using the production fallback.`
+                  : "Open the Android app and add this account again to refresh its Google token."}
               </div>
             )}
 

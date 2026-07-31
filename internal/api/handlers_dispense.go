@@ -137,10 +137,7 @@ func (s *Server) dispense(r *http.Request, dc gplay.DeviceConfig, locale string)
 			continue
 		}
 
-		bundle, mintErr := s.gplay.Mint(ctx, gplay.Account{
-			Email:    account.Email,
-			AASToken: aasToken,
-		}, dc, locale)
+		bundle, mintErr := s.mintStoredAccount(ctx, account, aasToken, dc, locale)
 
 		success := mintErr == nil
 

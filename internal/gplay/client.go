@@ -3,6 +3,7 @@ package gplay
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"gplaydl-dispenser/internal/pb"
+	proxycfg "gplaydl-dispenser/internal/proxy"
 
 	"google.golang.org/protobuf/proto"
 )
@@ -32,6 +34,8 @@ type Client struct {
 	http              *http.Client
 	sem               chan struct{}
 	tokenDispenserURL string
+	maxConcurrent     int
+	mintTimeout       time.Duration
 }
 
 func NewClient(maxConcurrent int, mintTimeout time.Duration, tokenDispenserURL string) *Client {
@@ -52,6 +56,8 @@ func NewClient(maxConcurrent int, mintTimeout time.Duration, tokenDispenserURL s
 		},
 		sem:               make(chan struct{}, maxConcurrent),
 		tokenDispenserURL: tokenDispenserURL,
+		maxConcurrent:     maxConcurrent,
+		mintTimeout:       mintTimeout,
 	}
 }
 
@@ -63,8 +69,44 @@ type authPayload struct {
 	dfeCookie              string
 }
 
-// Mint runs the full 4-step handshake and returns an AuthBundle.
-func (c *Client) Mint(ctx context.Context, account Account, dc DeviceConfig, locale string) (*AuthBundle, error) {
+type httpStatusError struct {
+	statusCode int
+	body       []byte
+}
+
+func (e *httpStatusError) Error() string {
+	return fmt.Sprintf("HTTP %d", e.statusCode)
+}
+
+type connectionError struct{}
+
+func (e *connectionError) Error() string { return "request failed" }
+
+// IsProxyConnectionError reports whether a failed proxied mint could not
+// establish or maintain a usable route. It intentionally excludes credential
+// and application-level Google responses.
+func IsProxyConnectionError(err error) bool {
+	var connectionErr *connectionError
+	if errors.As(err, &connectionErr) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var statusErr *httpStatusError
+	if !errors.As(err, &statusErr) {
+		return false
+	}
+	switch statusErr.statusCode {
+	case http.StatusProxyAuthRequired, http.StatusBadGateway,
+		http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
+}
+
+// Mint runs the full 4-step handshake and returns an AuthBundle. When
+// proxyURL is non-empty, every request in this handshake uses one immutable
+// proxy transport.
+func (c *Client) Mint(ctx context.Context, account Account, dc DeviceConfig, locale, proxyURL string) (*AuthBundle, error) {
 	select {
 	case c.sem <- struct{}{}:
 		defer func() { <-c.sem }()
@@ -72,9 +114,24 @@ func (c *Client) Mint(ctx context.Context, account Account, dc DeviceConfig, loc
 		return nil, ctx.Err()
 	}
 
+	httpClient := c.http
+	if proxyURL != "" {
+		transport, err := proxycfg.NewTransport(proxyURL)
+		if err != nil {
+			return nil, &connectionError{}
+		}
+		transport.MaxIdleConns = c.maxConcurrent * 2
+		transport.MaxIdleConnsPerHost = c.maxConcurrent
+		transport.MaxConnsPerHost = c.maxConcurrent * 2
+		transport.IdleConnTimeout = 90 * time.Second
+		transport.ForceAttemptHTTP2 = true
+		defer transport.CloseIdleConnections()
+		httpClient = &http.Client{Transport: transport, Timeout: c.mintTimeout}
+	}
+
 	userAgent := BuildUserAgent(dc)
 
-	checkinResp, err := c.checkIn(ctx, dc, userAgent)
+	checkinResp, err := c.checkIn(ctx, httpClient, dc, userAgent)
 	if err != nil {
 		return nil, fmt.Errorf("checkin: %w", err)
 	}
@@ -86,18 +143,18 @@ func (c *Client) Mint(ctx context.Context, account Account, dc DeviceConfig, loc
 		deviceConsistencyToken: checkinResp.GetDeviceCheckinConsistencyToken(),
 	}
 
-	deviceConfigToken, err := c.uploadDeviceConfig(ctx, dc, payload, locale)
+	deviceConfigToken, err := c.uploadDeviceConfig(ctx, httpClient, dc, payload, locale)
 	if err != nil {
 		return nil, fmt.Errorf("uploadDeviceConfig: %w", err)
 	}
 	payload.deviceConfigToken = deviceConfigToken
 
-	authToken, err := c.exchangeAASToken(ctx, account, dc, gsfID, locale)
+	authToken, err := c.exchangeAASToken(ctx, httpClient, account, dc, gsfID, locale)
 	if err != nil {
 		return nil, fmt.Errorf("auth: %w", err)
 	}
 
-	dfeCookie, err := c.acceptTOC(ctx, payload, authToken, locale)
+	dfeCookie, err := c.acceptTOC(ctx, httpClient, payload, authToken, locale)
 	if err != nil {
 		return nil, fmt.Errorf("toc: %w", err)
 	}
@@ -126,7 +183,7 @@ func (c *Client) Mint(ctx context.Context, account Account, dc DeviceConfig, loc
 	}, nil
 }
 
-func (c *Client) checkIn(ctx context.Context, dc DeviceConfig, userAgent string) (*pb.AndroidCheckinResponse, error) {
+func (c *Client) checkIn(ctx context.Context, httpClient *http.Client, dc DeviceConfig, userAgent string) (*pb.AndroidCheckinResponse, error) {
 	body, err := proto.Marshal(BuildCheckinRequest(dc))
 	if err != nil {
 		return nil, err
@@ -140,7 +197,7 @@ func (c *Client) checkIn(ctx context.Context, dc DeviceConfig, userAgent string)
 	req.Header.Set("Content-Type", "application/x-protobuffer")
 	req.Header.Set("User-Agent", userAgent)
 
-	data, err := c.do(req)
+	data, err := c.do(httpClient, req)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +212,7 @@ func (c *Client) checkIn(ctx context.Context, dc DeviceConfig, userAgent string)
 	return resp, nil
 }
 
-func (c *Client) uploadDeviceConfig(ctx context.Context, dc DeviceConfig, payload authPayload, locale string) (string, error) {
+func (c *Client) uploadDeviceConfig(ctx context.Context, httpClient *http.Client, dc DeviceConfig, payload authPayload, locale string) (string, error) {
 	body, err := proto.Marshal(&pb.UploadDeviceConfigRequest{
 		DeviceConfiguration: BuildDeviceConfigProto(dc),
 	})
@@ -170,7 +227,7 @@ func (c *Client) uploadDeviceConfig(ctx context.Context, dc DeviceConfig, payloa
 	setDFEHeaders(req, payload, locale, "")
 	req.Header.Set("Content-Type", "application/x-protobuf")
 
-	data, err := c.do(req)
+	data, err := c.do(httpClient, req)
 	if err != nil {
 		return "", err
 	}
@@ -183,7 +240,7 @@ func (c *Client) uploadDeviceConfig(ctx context.Context, dc DeviceConfig, payloa
 }
 
 // exchangeAASToken trades a long-lived AAS token for a Play Store OAuth token.
-func (c *Client) exchangeAASToken(ctx context.Context, account Account, dc DeviceConfig, gsfID, locale string) (string, error) {
+func (c *Client) exchangeAASToken(ctx context.Context, httpClient *http.Client, account Account, dc DeviceConfig, gsfID, locale string) (string, error) {
 	params := url.Values{
 		"app":                          {"com.android.vending"},
 		"oauth2_foreground":            {"1"},
@@ -211,8 +268,14 @@ func (c *Client) exchangeAASToken(ctx context.Context, account Account, dc Devic
 	req.Header.Set("device", gsfID)
 	req.Header.Set("User-Agent", authUserAgent(dc))
 
-	data, err := c.do(req)
+	data, err := c.do(httpClient, req)
 	if err != nil {
+		var statusErr *httpStatusError
+		if errors.As(err, &statusErr) {
+			if code := parseKeyValues(string(statusErr.body))["Error"]; isPermanentCredentialError(code) {
+				return "", &CredentialError{Code: code}
+			}
+		}
 		return "", err
 	}
 
@@ -221,19 +284,22 @@ func (c *Client) exchangeAASToken(ctx context.Context, account Account, dc Devic
 		return auth, nil
 	}
 	if e := kv["Error"]; e != "" {
-		return "", fmt.Errorf("google rejected credentials: %s", e)
+		if isPermanentCredentialError(e) {
+			return "", &CredentialError{Code: e}
+		}
+		return "", errors.New("google authentication service error")
 	}
 	return "", fmt.Errorf("no Auth token in response")
 }
 
-func (c *Client) acceptTOC(ctx context.Context, payload authPayload, bearerToken, locale string) (string, error) {
+func (c *Client) acceptTOC(ctx context.Context, httpClient *http.Client, payload authPayload, bearerToken, locale string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tocURL, nil)
 	if err != nil {
 		return "", err
 	}
 	setDFEHeaders(req, payload, locale, bearerToken)
 
-	data, err := c.do(req)
+	data, err := c.do(httpClient, req)
 	if err != nil {
 		return "", err
 	}
@@ -245,25 +311,40 @@ func (c *Client) acceptTOC(ctx context.Context, payload authPayload, bearerToken
 	return wrapper.GetPayload().GetTocResponse().GetCookie(), nil
 }
 
-func (c *Client) do(req *http.Request) ([]byte, error) {
-	resp, err := c.http.Do(req)
+func (c *Client) do(httpClient *http.Client, req *http.Request) ([]byte, error) {
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		// url.Error includes the complete request URL. The auth request carries
+		// both the email and AAS token in its query, so never return that error.
+		if errors.Is(err, context.Canceled) {
+			return nil, context.Canceled
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, context.DeadlineExceeded
+		}
+		return nil, &connectionError{}
 	}
 	defer resp.Body.Close()
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
-		return nil, err
+		return nil, &connectionError{}
 	}
 	if resp.StatusCode != http.StatusOK {
-		msg := strings.TrimSpace(string(data))
-		if len(msg) > 200 {
-			msg = msg[:200]
-		}
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, msg)
+		return nil, &httpStatusError{statusCode: resp.StatusCode, body: data}
 	}
 	return data, nil
+}
+
+func isPermanentCredentialError(code string) bool {
+	switch code {
+	case "BadAuthentication", "AccountDeleted", "AccountDisabled",
+		"AccountMigrated", "CaptchaRequired", "InvalidSecondFactor",
+		"NeedsBrowser", "NotVerified", "ServiceDisabled", "TermsNotAgreed":
+		return true
+	default:
+		return false
+	}
 }
 
 func authUserAgent(dc DeviceConfig) string {

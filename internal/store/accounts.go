@@ -6,32 +6,43 @@ import (
 )
 
 type Account struct {
-	ID           string     `json:"id"`
-	OwnerID      string     `json:"ownerId"`
-	Email        string     `json:"email"`
-	AASTokenEnc  []byte     `json:"-"`
-	Visibility   string     `json:"visibility"`
-	Status       string     `json:"status"`
-	LastUsedAt   *time.Time `json:"lastUsedAt"`
-	FailureCount int        `json:"failureCount"`
-	MintCount    int64      `json:"mintCount"`
-	CreatedAt    time.Time  `json:"createdAt"`
-	Source       string     `json:"source"`
-	SharedAt     *time.Time `json:"sharedAt"`
-	LastSyncedAt *time.Time `json:"lastSyncedAt"`
+	ID                 string     `json:"id"`
+	OwnerID            string     `json:"ownerId"`
+	Email              string     `json:"email"`
+	AASTokenEnc        []byte     `json:"-"`
+	Visibility         string     `json:"visibility"`
+	Status             string     `json:"status"`
+	LastUsedAt         *time.Time `json:"lastUsedAt"`
+	FailureCount       int        `json:"failureCount"`
+	MintCount          int64      `json:"mintCount"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	Source             string     `json:"source"`
+	SharedAt           *time.Time `json:"sharedAt"`
+	LastSyncedAt       *time.Time `json:"lastSyncedAt"`
+	ProxyURLEnc        []byte     `json:"-"`
+	ProxyConfigured    bool       `json:"proxyConfigured"`
+	ProxyTestStatus    string     `json:"proxyTestStatus,omitempty"`
+	ProxyTestedAt      *time.Time `json:"proxyTestedAt,omitempty"`
+	ProxyFailureCount  int        `json:"proxyFailureCount"`
+	LastProxyFailureAt *time.Time `json:"lastProxyFailureAt,omitempty"`
 }
 
 const accountCols = `id, owner_id, email, aas_token_enc, visibility, status,
-	last_used_at, failure_count, mint_count, created_at, source, shared_at, last_synced_at`
+	last_used_at, failure_count, mint_count, created_at, source, shared_at, last_synced_at,
+	proxy_url_enc, coalesce(proxy_test_status, ''), proxy_tested_at,
+	proxy_failure_count, last_proxy_failure_at`
 
 func scanAccount(row interface{ Scan(...any) error }) (*Account, error) {
 	a := &Account{}
 	err := row.Scan(&a.ID, &a.OwnerID, &a.Email, &a.AASTokenEnc, &a.Visibility,
 		&a.Status, &a.LastUsedAt, &a.FailureCount, &a.MintCount, &a.CreatedAt,
-		&a.Source, &a.SharedAt, &a.LastSyncedAt)
+		&a.Source, &a.SharedAt, &a.LastSyncedAt, &a.ProxyURLEnc,
+		&a.ProxyTestStatus, &a.ProxyTestedAt, &a.ProxyFailureCount,
+		&a.LastProxyFailureAt)
 	if err != nil {
 		return nil, wrapErr(err)
 	}
+	a.ProxyConfigured = len(a.ProxyURLEnc) > 0
 	return a, nil
 }
 
@@ -103,6 +114,57 @@ func (s *Store) DeleteAccount(ctx context.Context, id, ownerID string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// SetAccountProxyIfMissing installs the first generated assignment and leaves
+// an existing assignment untouched when concurrent syncs race.
+func (s *Store) SetAccountProxyIfMissing(ctx context.Context, accountID string, proxyURLEnc []byte, testStatus string, testedAt time.Time) (bool, error) {
+	failureCount := 0
+	var lastFailureAt *time.Time
+	if testStatus == "failed" {
+		failureCount = 1
+		lastFailureAt = &testedAt
+	}
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE accounts SET
+			proxy_url_enc = $2,
+			proxy_test_status = $3,
+			proxy_tested_at = $4,
+			proxy_failure_count = $5,
+			last_proxy_failure_at = $6,
+			updated_at = now()
+		WHERE id = $1 AND proxy_url_enc IS NULL`,
+		accountID, proxyURLEnc, testStatus, testedAt, failureCount, lastFailureAt)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// RecordProxyResult tracks consecutive connection failures independently from
+// credential failures. A successful proxied connection immediately restores
+// the account's proxy health and resets the counter.
+func (s *Store) RecordProxyResult(ctx context.Context, accountID string, success bool) (int, error) {
+	var count int
+	if success {
+		err := s.pool.QueryRow(ctx, `
+			UPDATE accounts SET
+				proxy_failure_count = 0,
+				proxy_test_status = 'passed',
+				updated_at = now()
+			WHERE id = $1
+			RETURNING proxy_failure_count`, accountID).Scan(&count)
+		return count, wrapErr(err)
+	}
+	err := s.pool.QueryRow(ctx, `
+		UPDATE accounts SET
+			proxy_failure_count = proxy_failure_count + 1,
+			proxy_test_status = 'failed',
+			last_proxy_failure_at = now(),
+			updated_at = now()
+		WHERE id = $1
+		RETURNING proxy_failure_count`, accountID).Scan(&count)
+	return count, wrapErr(err)
 }
 
 // NextAccount atomically claims the caller's least-recently-used active

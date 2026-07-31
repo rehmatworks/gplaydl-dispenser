@@ -45,6 +45,19 @@ func (s *Server) requireSession(next http.Handler) http.Handler {
 	})
 }
 
+// requireAdmin is deliberately session-only. Device and CLI API keys may
+// manage their own accounts but cannot change server-wide settings.
+func (s *Server) requireAdmin(next http.Handler) http.Handler {
+	return s.requireSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := userFrom(r.Context())
+		if user == nil || !user.IsAdmin {
+			writeError(w, http.StatusForbidden, "administrator access required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	}))
+}
+
 // maybeAPIKey attaches a user when a valid X-Api-Key header (or api_key query
 // param) is present; anonymous requests pass through untouched.
 func (s *Server) maybeAPIKey(next http.Handler) http.Handler {

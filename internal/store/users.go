@@ -18,15 +18,16 @@ type User struct {
 	ID        string    `json:"id"`
 	CreatedAt time.Time `json:"createdAt"`
 	// Kind is "web" for email/password users and "device" for app enrolments.
-	Kind  string `json:"kind"`
-	Label string `json:"label"`
+	Kind    string `json:"kind"`
+	Label   string `json:"label"`
+	IsAdmin bool   `json:"isAdmin"`
 }
 
-const userCols = `id, created_at, kind, coalesce(label, '')`
+const userCols = `id, created_at, kind, coalesce(label, ''), is_admin`
 
 func scanUser(row interface{ Scan(...any) error }, extra ...any) (*User, error) {
 	u := &User{}
-	dest := append([]any{&u.ID, &u.CreatedAt, &u.Kind, &u.Label}, extra...)
+	dest := append([]any{&u.ID, &u.CreatedAt, &u.Kind, &u.Label, &u.IsAdmin}, extra...)
 	if err := row.Scan(dest...); err != nil {
 		return nil, wrapErr(err)
 	}
@@ -83,7 +84,7 @@ func (s *Store) UserByAPIKeyHash(ctx context.Context, keyHash string) (*User, er
 	return scanUser(s.pool.QueryRow(ctx, `
 		SELECT `+userCols+` FROM users WHERE api_key_hash = $1
 		UNION ALL
-		SELECT u.id, u.created_at, u.kind, coalesce(u.label, '')
+		SELECT u.id, u.created_at, u.kind, coalesce(u.label, ''), u.is_admin
 		FROM api_keys k JOIN users u ON u.id = k.user_id
 		WHERE k.key_hash = $1
 		LIMIT 1`, keyHash))
@@ -117,7 +118,7 @@ func (s *Store) CreateSession(ctx context.Context, tokenHash, userID string, ttl
 
 func (s *Store) UserBySession(ctx context.Context, tokenHash string) (*User, error) {
 	return scanUser(s.pool.QueryRow(ctx, `
-		SELECT u.id, u.created_at, u.kind, coalesce(u.label, '')
+		SELECT u.id, u.created_at, u.kind, coalesce(u.label, ''), u.is_admin
 		FROM sessions s JOIN users u ON u.id = s.user_id
 		WHERE s.token_hash = $1 AND s.expires_at > now()`,
 		tokenHash))
