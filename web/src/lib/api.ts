@@ -35,6 +35,14 @@ export interface ProxySettings {
   proxyConfigured: boolean
 }
 
+export interface ProxyBackfillResult {
+  targeted: number
+  updated: number
+  passed: number
+  failed: number
+  errors: number
+}
+
 export class ApiError extends Error {
   status: number
   constructor(status: number, message: string) {
@@ -80,6 +88,11 @@ export const api = {
   clearProxy: () =>
     request<ProxySettings>("/api/v1/admin/settings/proxy", {
       method: "DELETE"
+    }),
+
+  backfillProxies: () =>
+    request<ProxyBackfillResult>("/api/v1/admin/settings/proxy/backfill", {
+      method: "POST"
     }),
 
   /** Trades a code shown by the Android app for a browser session. */

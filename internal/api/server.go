@@ -88,6 +88,7 @@ func (s *Server) Router() http.Handler {
 			r.Get("/admin/settings", s.handleAdminSettings)
 			r.Put("/admin/settings/proxy", s.handleSetProxyTemplate)
 			r.Delete("/admin/settings/proxy", s.handleClearProxyTemplate)
+			r.Post("/admin/settings/proxy/backfill", s.handleBackfillAccountProxies)
 		})
 
 		// Shared by the dashboard (session cookie) and the app (API key).

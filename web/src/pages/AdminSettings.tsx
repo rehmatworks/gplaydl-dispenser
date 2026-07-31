@@ -43,8 +43,10 @@ export default function AdminSettings() {
   const [loadError, setLoadError] = useState(false)
   const [saving, setSaving] = useState(false)
   const [clearing, setClearing] = useState(false)
+  const [backfilling, setBackfilling] = useState(false)
   const [showTemplate, setShowTemplate] = useState(false)
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
+  const [backfillDialogOpen, setBackfillDialogOpen] = useState(false)
 
   const loadSettings = useCallback(async () => {
     setLoading(true)
@@ -96,6 +98,28 @@ export default function AdminSettings() {
       toast.error(error instanceof ApiError ? error.message : "Could not clear the proxy template")
     } finally {
       setClearing(false)
+    }
+  }
+
+  async function backfillProxies() {
+    setBackfilling(true)
+    try {
+      const result = await api.backfillProxies()
+      setBackfillDialogOpen(false)
+      if (result.targeted === 0) {
+        toast.success("All account proxies are already healthy")
+      } else {
+        toast.success(`Updated ${result.updated} of ${result.targeted} account proxies`)
+        if (result.failed > 0 || result.errors > 0) {
+          toast.warning(
+            `${result.failed} proxies failed testing; ${result.errors} accounts could not be updated`
+          )
+        }
+      }
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Could not backfill account proxies")
+    } finally {
+      setBackfilling(false)
     }
   }
 
@@ -198,7 +222,7 @@ export default function AdminSettings() {
                           ? "Enter a new template to replace the current one"
                           : "Enter a proxy URL template"
                       }
-                      disabled={loading || loadError || saving || clearing}
+                      disabled={loading || loadError || saving || clearing || backfilling}
                       className="h-12 rounded-xl bg-input/40 pr-12 font-mono"
                       aria-describedby="proxy-template-help"
                     />
@@ -234,20 +258,51 @@ export default function AdminSettings() {
                 </div>
 
                 <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-between">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setClearDialogOpen(true)}
-                    disabled={!proxyConfigured || loading || loadError || saving || clearing}
-                    className="rounded-xl text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="size-4" />
-                    Clear proxy
-                  </Button>
+                  <div className="flex flex-col-reverse gap-3 sm:flex-row">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setClearDialogOpen(true)}
+                      disabled={
+                        !proxyConfigured ||
+                        loading ||
+                        loadError ||
+                        saving ||
+                        clearing ||
+                        backfilling
+                      }
+                      className="rounded-xl text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="size-4" />
+                      Clear proxy
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setBackfillDialogOpen(true)}
+                      disabled={
+                        !proxyConfigured ||
+                        loading ||
+                        loadError ||
+                        saving ||
+                        clearing ||
+                        backfilling
+                      }
+                      className="rounded-xl"
+                    >
+                      <RefreshCw className={`size-4 ${backfilling ? "animate-spin" : ""}`} />
+                      Backfill accounts
+                    </Button>
+                  </div>
                   <Button
                     type="submit"
                     disabled={
-                      !proxyTemplate.trim() || loading || loadError || saving || clearing
+                      !proxyTemplate.trim() ||
+                      loading ||
+                      loadError ||
+                      saving ||
+                      clearing ||
+                      backfilling
                     }
                     className="btn-aurora rounded-xl"
                   >
@@ -320,6 +375,35 @@ export default function AdminSettings() {
             >
               <Trash2 className="size-4" />
               {clearing ? "Clearing…" : "Clear proxy"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={backfillDialogOpen}
+        onOpenChange={(open) => {
+          if (!backfilling) setBackfillDialogOpen(open)
+        }}
+      >
+        <DialogContent className="glass-strong rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Backfill account proxies?</DialogTitle>
+            <DialogDescription>
+              Accounts without a proxy and accounts whose proxy is currently failing will receive
+              a new assignment from the saved template. Every new assignment will be tested;
+              healthy existing proxies will not change.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" className="rounded-xl" disabled={backfilling}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button className="btn-aurora rounded-xl" onClick={backfillProxies} disabled={backfilling}>
+              <RefreshCw className={`size-4 ${backfilling ? "animate-spin" : ""}`} />
+              {backfilling ? "Backfilling…" : "Backfill proxies"}
             </Button>
           </DialogFooter>
         </DialogContent>

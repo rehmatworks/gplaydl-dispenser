@@ -141,6 +141,60 @@ func (s *Store) SetAccountProxyIfMissing(ctx context.Context, accountID string, 
 	return tag.RowsAffected() > 0, nil
 }
 
+// AccountsNeedingProxyBackfill returns accounts without an assignment or
+// whose current assignment has recorded a failed connection. Healthy proxies
+// are intentionally left stable.
+func (s *Store) AccountsNeedingProxyBackfill(ctx context.Context) ([]*Account, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT `+accountCols+` FROM accounts
+		WHERE proxy_url_enc IS NULL
+		   OR proxy_test_status = 'failed'
+		   OR proxy_failure_count > 0
+		ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	accounts := []*Account{}
+	for rows.Next() {
+		account, err := scanAccount(rows)
+		if err != nil {
+			return nil, err
+		}
+		accounts = append(accounts, account)
+	}
+	return accounts, rows.Err()
+}
+
+// ReplaceAccountProxy installs a freshly expanded assignment during an
+// administrator-initiated backfill.
+func (s *Store) ReplaceAccountProxy(ctx context.Context, accountID string, proxyURLEnc []byte, testStatus string, testedAt time.Time) error {
+	failureCount := 0
+	var lastFailureAt *time.Time
+	if testStatus == "failed" {
+		failureCount = 1
+		lastFailureAt = &testedAt
+	}
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE accounts SET
+			proxy_url_enc = $2,
+			proxy_test_status = $3,
+			proxy_tested_at = $4,
+			proxy_failure_count = $5,
+			last_proxy_failure_at = $6,
+			updated_at = now()
+		WHERE id = $1`,
+		accountID, proxyURLEnc, testStatus, testedAt, failureCount, lastFailureAt)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // RecordProxyResult tracks consecutive connection failures independently from
 // credential failures. A successful proxied connection immediately restores
 // the account's proxy health and resets the counter.

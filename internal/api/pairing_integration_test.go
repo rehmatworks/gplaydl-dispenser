@@ -193,6 +193,15 @@ func TestPairingOnlyAPI(t *testing.T) {
 	})
 
 	t.Run("failed proxy probe is saved and assignment is preserved", func(t *testing.T) {
+		headers := map[string]string{"X-Api-Key": apiKey}
+		token := "aas_et/" + strings.Repeat("p", 40)
+		emptyCreated := performJSONRequest(router, http.MethodPost, "/api/v1/accounts",
+			`{"email":"empty-proxy@example.test","aasToken":"`+token+`"}`, headers)
+		if emptyCreated.Code != http.StatusCreated {
+			t.Fatalf("create account before proxy setting: got %d: %s",
+				emptyCreated.Code, emptyCreated.Body.String())
+		}
+
 		template := "http://user:password@proxy.example:{rand_int:12345-12345}"
 		encryptedTemplate, err := box.Encrypt(template)
 		if err != nil {
@@ -210,8 +219,6 @@ func TestPairingOnlyAPI(t *testing.T) {
 			_ = st.ClearProxyTemplate(ctx)
 		}()
 
-		headers := map[string]string{"X-Api-Key": apiKey}
-		token := "aas_et/" + strings.Repeat("p", 40)
 		create := func() *httptest.ResponseRecorder {
 			return performJSONRequest(router, http.MethodPost, "/api/v1/accounts",
 				`{"email":"proxy@example.test","aasToken":"`+token+`"}`, headers)
@@ -228,14 +235,17 @@ func TestPairingOnlyAPI(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var assigned *store.Account
+		var assigned, empty *store.Account
 		for _, account := range accounts {
 			if account.Email == "proxy@example.test" {
 				assigned = account
 			}
+			if account.Email == "empty-proxy@example.test" {
+				empty = account
+			}
 		}
-		if assigned == nil {
-			t.Fatal("proxied account was not stored")
+		if assigned == nil || empty == nil {
+			t.Fatalf("backfill fixtures missing: assigned=%v empty=%v", assigned != nil, empty != nil)
 		}
 		firstURL, err := box.Decrypt(assigned.ProxyURLEnc)
 		if err != nil {
@@ -250,6 +260,29 @@ func TestPairingOnlyAPI(t *testing.T) {
 		}
 		if count, err := st.RecordProxyResult(ctx, assigned.ID, false); err != nil || count != 2 {
 			t.Fatalf("record second proxy failure: count %d, err %v", count, err)
+		}
+
+		server.probeProxy = func(context.Context, string) error { return nil }
+		adminCookie := &http.Cookie{Name: sessionCookie, Value: "admin-settings-session"}
+		backfill := performRequest(router, http.MethodPost,
+			"/api/v1/admin/settings/proxy/backfill", "", adminCookie)
+		if backfill.Code != http.StatusOK ||
+			!strings.Contains(backfill.Body.String(), `"targeted":2`) ||
+			!strings.Contains(backfill.Body.String(), `"updated":2`) ||
+			!strings.Contains(backfill.Body.String(), `"passed":2`) {
+			t.Fatalf("backfill proxies: got %d: %s", backfill.Code, backfill.Body.String())
+		}
+
+		empty, err = st.AccountByID(ctx, empty.ID, user.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !empty.ProxyConfigured || empty.ProxyFailureCount != 0 ||
+			empty.ProxyTestStatus != "passed" {
+			t.Fatalf("empty account was not backfilled: %#v", empty)
+		}
+		if count, err := st.RecordProxyResult(ctx, assigned.ID, false); err != nil || count != 1 {
+			t.Fatalf("record post-backfill proxy failure: count %d, err %v", count, err)
 		}
 		if count, err := st.RecordProxyResult(ctx, assigned.ID, true); err != nil || count != 0 {
 			t.Fatalf("reset proxy failures: count %d, err %v", count, err)
@@ -274,6 +307,9 @@ func TestPairingOnlyAPI(t *testing.T) {
 				reloaded.ProxyFailureCount, reloaded.ProxyTestStatus)
 		}
 		if err := st.DeleteAccount(ctx, assigned.ID, user.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.DeleteAccount(ctx, empty.ID, user.ID); err != nil {
 			t.Fatal(err)
 		}
 	})
