@@ -37,13 +37,6 @@ export default function Landing() {
     api.appLatest().then(setRelease).catch(() => {})
   }, [])
 
-  // The browser resolves the initial hash before React has rendered the
-  // target, so /#terms and /#privacy from the app would land at the top.
-  useEffect(() => {
-    const id = window.location.hash.slice(1)
-    if (id) document.getElementById(id)?.scrollIntoView()
-  }, [])
-
   const downloadUrl = release?.url || fallbackDownload
   // Prefer the protected dashboard while auth is still loading. It will
   // redirect unauthenticated visitors to pairing once the session check ends.
@@ -83,14 +76,6 @@ export default function Landing() {
           This dispenser mints Google Play tokens from accounts you add yourself. Your
           accounts stay private to you, and setting up takes about two minutes.
         </p>
-        <div
-          className="mt-6 rounded-2xl border border-chart-4/30 bg-chart-4/8 px-4 py-3 text-sm leading-relaxed text-muted-foreground"
-          role="note"
-        >
-          <span className="font-medium text-foreground">Please use gplaydl with care.</span>{" "}
-          Google may flag, lock, or restrict accounts used with unofficial clients. We
-          recommend a separate account, and ask that you continue at your own risk.
-        </div>
 
         <section className="mt-10 grid gap-10 md:grid-cols-[1fr_auto]">
           <ol className="space-y-7">
@@ -182,85 +167,6 @@ export default function Landing() {
           </p>
         </section>
 
-        <section id="terms" className="mt-16 scroll-mt-20 border-t border-border/60 pt-10">
-          <h2 className="text-lg font-semibold">Terms</h2>
-          <dl className="mt-5 space-y-5 text-sm leading-relaxed">
-            <div>
-              <dt className="font-medium">Use a spare account</dt>
-              <dd className="mt-1 text-muted-foreground">
-                Prefer a throwaway over your primary, work, or payment-linked account. An AAS
-                token can browse and download free Play apps as that account, and Google may
-                flag, rate-limit, lock, or restrict accounts it sees on unofficial clients.
-                Please continue at your own risk.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium">Add only accounts that are yours</dt>
-              <dd className="mt-1 text-muted-foreground">
-                Sign in with accounts you own and control. Do not upload someone else&apos;s
-                credentials.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium">You can remove an account at any time</dt>
-              <dd className="mt-1 text-muted-foreground">
-                Deleting an account in the app erases it from the dispenser and stops all
-                future dispensing. Play sessions already handed to your own gplaydl are
-                short-lived and expire on their own.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium">No warranty</dt>
-              <dd className="mt-1 text-muted-foreground">
-                This is a best-effort service with no uptime promise. It may change or shut
-                down, and it is not affiliated with Google. You can always self-host.
-              </dd>
-            </div>
-          </dl>
-        </section>
-
-        <section id="privacy" className="mt-16 scroll-mt-20 border-t border-border/60 pt-10">
-          <h2 className="text-lg font-semibold">Privacy</h2>
-          <dl className="mt-5 space-y-5 text-sm leading-relaxed">
-            <div>
-              <dt className="font-medium">What is stored</dt>
-              <dd className="mt-1 text-muted-foreground">
-                The Google account address and its AAS token, encrypted at rest with
-                AES-256-GCM, plus how often the account has been used and when it was last
-                used. The app enrols your phone as an anonymous device, so there is no name,
-                email, or password behind it.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium">Your Google password never reaches us</dt>
-              <dd className="mt-1 text-muted-foreground">
-                Sign-in happens with Google inside the app. Passwords, two-factor codes, and
-                cookies stay on your phone; only the resulting token is uploaded.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium">Your accounts are yours alone</dt>
-              <dd className="mt-1 text-muted-foreground">
-                An account you add is only ever used to serve your own linked gplaydl. It is
-                never handed to anyone else and never appears in a shared pool.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium">Logs</dt>
-              <dd className="mt-1 text-muted-foreground">
-                IP addresses appear in short-lived server logs and in rate limiting. They are
-                never written to the database or tied to an account.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium">Deletion is deletion</dt>
-              <dd className="mt-1 text-muted-foreground">
-                Removing an account erases its address and token from the database. Usage
-                counters kept for service health survive, with nothing left to link them to.
-              </dd>
-            </div>
-          </dl>
-        </section>
       </main>
 
       <footer className="mx-auto flex max-w-4xl flex-col gap-4 border-t border-border/60 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
@@ -290,10 +196,10 @@ export default function Landing() {
           >
             Source
           </a>
-          <a href="#terms" className="whitespace-nowrap hover:text-foreground">
+          <a href="/terms" className="whitespace-nowrap hover:text-foreground">
             Terms
           </a>
-          <a href="#privacy" className="whitespace-nowrap hover:text-foreground">
+          <a href="/privacy" className="whitespace-nowrap hover:text-foreground">
             Privacy
           </a>
         </div>

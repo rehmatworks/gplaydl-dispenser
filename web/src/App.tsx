@@ -4,6 +4,8 @@ import Dashboard from "./pages/Dashboard"
 import Landing from "./pages/Landing"
 import Pair from "./pages/Pair"
 import AdminSettings from "./pages/AdminSettings"
+import Privacy from "./pages/Privacy"
+import Terms from "./pages/Terms"
 
 function ProtectedDashboard() {
   const { user, loading } = useAuth()
@@ -47,6 +49,10 @@ export default function App() {
       return <ProtectedDashboard />
     case "/admin/settings":
       return <ProtectedAdminSettings />
+    case "/terms":
+      return <Terms />
+    case "/privacy":
+      return <Privacy />
     default:
       return <Landing />
   }

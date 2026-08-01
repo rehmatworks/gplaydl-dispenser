@@ -62,13 +62,6 @@ export default function Pair() {
             </p>
           </CardHeader>
           <CardContent className="p-6 pt-4">
-            <div
-              className="mb-5 rounded-xl border border-chart-4/30 bg-chart-4/8 p-3 text-sm leading-relaxed text-muted-foreground"
-              role="note"
-            >
-              Google may flag or restrict accounts used with unofficial clients. Please use
-              a separate account and continue at your own risk.
-            </div>
             <form onSubmit={submit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="code">Pairing code</Label>
@@ -94,6 +87,17 @@ export default function Pair() {
             <p className="mt-5 text-center text-sm text-muted-foreground">
               Codes expire after 10 minutes and work once. Generate a new code in the Android
               app whenever you need to reconnect.
+            </p>
+            <p className="mt-3 text-center text-xs leading-relaxed text-muted-foreground">
+              By pairing, you agree to the{" "}
+              <a href="/terms" className="text-primary hover:underline">
+                terms
+              </a>{" "}
+              and acknowledge the{" "}
+              <a href="/privacy" className="text-primary hover:underline">
+                privacy policy
+              </a>
+              .
             </p>
           </CardContent>
         </Card>

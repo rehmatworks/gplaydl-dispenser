@@ -104,17 +104,6 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        <div
-          className="flex items-start gap-3 rounded-2xl border border-chart-4/30 bg-chart-4/8 p-4 text-sm"
-          role="note"
-        >
-          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-chart-4" />
-          <p className="leading-relaxed text-muted-foreground">
-            Google may flag, lock, or restrict accounts used with unofficial clients. Please
-            use a separate account and continue at your own risk.
-          </p>
-        </div>
-
         {loadError && (
           <div className="flex items-center gap-3 rounded-2xl border border-chart-4/30 bg-chart-4/8 p-4 text-sm">
             <AlertTriangle className="size-5 shrink-0 text-chart-4" />
