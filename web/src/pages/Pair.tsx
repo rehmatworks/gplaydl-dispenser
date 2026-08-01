@@ -70,7 +70,7 @@ export default function Pair() {
                   required
                   autoFocus
                   autoComplete="one-time-code"
-                  placeholder="ABCD 1234"
+                  placeholder="ABCD 2345"
                   value={code}
                   onChange={(e) => setCode(e.target.value.toUpperCase())}
                   className="h-14 rounded-xl bg-input/50 text-center font-mono text-2xl tracking-[0.3em]"
