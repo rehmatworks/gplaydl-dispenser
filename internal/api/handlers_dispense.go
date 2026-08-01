@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,6 +26,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 // returns {email, auth} minted with the default device profile. It still
 // requires a linked API key and serves only the caller's own accounts; the
 // name is kept for wire compatibility with the original endpoint.
+//
+// Passing full=1 returns the whole bundle instead, for callers that ship no
+// device profile of their own and so cannot use POST. It exposes nothing a
+// keyed caller could not already obtain by POSTing a profile.
 func (s *Server) handleDispenseAnonymous(w http.ResponseWriter, r *http.Request) {
 	// Whether the caller may dispense at all comes before anything about how.
 	if userFrom(r.Context()) == nil {
@@ -42,6 +47,10 @@ func (s *Server) handleDispenseAnonymous(w http.ResponseWriter, r *http.Request)
 	bundle, err := s.dispense(r, dc, locale)
 	if err != nil {
 		s.dispenseError(w, err)
+		return
+	}
+	if queryBool(r, "full") {
+		writeJSON(w, http.StatusOK, bundle)
 		return
 	}
 	writeJSON(w, http.StatusOK, gplay.AnonymousAuthBundle{
@@ -192,4 +201,9 @@ func queryDefault(r *http.Request, key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func queryBool(r *http.Request, key string) bool {
+	value, err := strconv.ParseBool(r.URL.Query().Get(key))
+	return err == nil && value
 }

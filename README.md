@@ -40,6 +40,11 @@ Query params for `/api/auth`:
 - `locale` — locale for the bundle (default `en`)
 - `device` — device profile name from `resources/` (GET only, default `arm64_xxhdpi`)
 - `email` — pick a specific one of your accounts when you added several
+- `full` — return the whole `AuthBundle` rather than `{email, auth}` (GET only)
+
+Use `GET /api/auth?full=1` when the caller has no device profile of its own: the
+dispenser mints with a profile from `resources/` and hands back every field the
+Play API needs, including `gsfId`. Plain `GET` omits those fields.
 
 Pass your API key as an `X-Api-Key` header (or `api_key` query param). With no `email`
 the dispenser rotates through your own accounts least-recently-used; API-key requests

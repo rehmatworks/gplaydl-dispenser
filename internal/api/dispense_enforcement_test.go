@@ -209,4 +209,11 @@ func TestDispenseEnforcement(t *testing.T) {
 			t.Fatalf("GET without key: got %d, want 401", anon.Code)
 		}
 	})
+
+	t.Run("asking for the full bundle is key-gated too", func(t *testing.T) {
+		anon := performJSONRequest(router, http.MethodGet, "/api/auth?full=1", "", nil)
+		if anon.Code != http.StatusUnauthorized {
+			t.Fatalf("full GET without key: got %d, want 401", anon.Code)
+		}
+	})
 }
