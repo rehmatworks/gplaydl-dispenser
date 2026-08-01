@@ -1,5 +1,6 @@
 import { CommandBlock } from "@/components/CommandBlock"
 import { Logo } from "@/components/Logo"
+import { PublicFooter } from "@/components/PublicFooter"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { api, type AppRelease } from "@/lib/api"
@@ -177,41 +178,7 @@ export default function Landing() {
 
       </main>
 
-      <footer className="mx-auto flex max-w-4xl flex-col gap-4 border-t border-border/60 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <Logo className="opacity-80" />
-        <div className="flex flex-wrap gap-x-5 gap-y-2">
-          <a href={dashboardHref} className="whitespace-nowrap hover:text-foreground">
-            Dashboard
-          </a>
-          <a href={downloadUrl} className="whitespace-nowrap hover:text-foreground">
-            Download app
-          </a>
-          <a href="https://gplaydl.com" className="whitespace-nowrap hover:text-foreground">
-            Web downloader
-          </a>
-          <a
-            href="https://github.com/rehmatworks/gplaydl"
-            className="whitespace-nowrap hover:text-foreground"
-          >
-            CLI
-          </a>
-          <a href="#selfhost" className="whitespace-nowrap hover:text-foreground">
-            Self-hosting
-          </a>
-          <a
-            href="https://github.com/rehmatworks/gplaydl-dispenser"
-            className="whitespace-nowrap hover:text-foreground"
-          >
-            Source
-          </a>
-          <a href="/terms" className="whitespace-nowrap hover:text-foreground">
-            Terms
-          </a>
-          <a href="/privacy" className="whitespace-nowrap hover:text-foreground">
-            Privacy
-          </a>
-        </div>
-      </footer>
+      <PublicFooter dashboardHref={dashboardHref} downloadHref={downloadUrl} />
     </div>
   )
 }
