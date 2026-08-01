@@ -58,12 +58,20 @@ export default function Landing() {
           <a href="/" aria-label="gplaydl dispenser home">
             <Logo />
           </a>
-          <Button asChild variant="outline" size="sm" className="glass rounded-xl">
-            <a href={dashboardHref}>
-              <Smartphone className="size-4" />
-              Dashboard
+          <div className="flex items-center gap-3">
+            <a
+              href="https://gplaydl.com"
+              className="hidden text-sm text-muted-foreground hover:text-foreground sm:inline"
+            >
+              APK downloader
             </a>
-          </Button>
+            <Button asChild variant="outline" size="sm" className="glass rounded-xl">
+              <a href={dashboardHref}>
+                <Smartphone className="size-4" />
+                Dashboard
+              </a>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -75,6 +83,14 @@ export default function Landing() {
           This dispenser mints Google Play tokens from accounts you add yourself. Your
           accounts stay private to you, and setting up takes about two minutes.
         </p>
+        <div
+          className="mt-6 rounded-2xl border border-chart-4/30 bg-chart-4/8 px-4 py-3 text-sm leading-relaxed text-muted-foreground"
+          role="note"
+        >
+          <span className="font-medium text-foreground">Please use gplaydl with care.</span>{" "}
+          Google may flag, lock, or restrict accounts used with unofficial clients. We
+          recommend a separate account, and ask that you continue at your own risk.
+        </div>
 
         <section className="mt-10 grid gap-10 md:grid-cols-[1fr_auto]">
           <ol className="space-y-7">
@@ -113,6 +129,13 @@ export default function Landing() {
           <p className="mt-3 text-xs text-muted-foreground">
             {release ? `Version ${release.version}` : "Latest release"} · signed APK
             {release?.sha256 ? ` · SHA-256 ${release.sha256.slice(0, 12)}…` : ""}
+            {" · "}
+            <a
+              href="https://github.com/rehmatworks/gplaydl-authenticator"
+              className="hover:text-foreground hover:underline"
+            >
+              source
+            </a>
           </p>
         </div>
 
@@ -132,6 +155,13 @@ export default function Landing() {
             <code className="rounded bg-muted px-1.5 py-0.5">--email you@gmail.com</code> to
             download as a specific one. Otherwise gplaydl rotates through the accounts you
             added.
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Prefer a browser? Open{" "}
+            <a className="text-primary hover:underline" href="https://gplaydl.com">
+              gplaydl web
+            </a>
+            .
           </p>
         </section>
 
@@ -160,7 +190,8 @@ export default function Landing() {
               <dd className="mt-1 text-muted-foreground">
                 Prefer a throwaway over your primary, work, or payment-linked account. An AAS
                 token can browse and download free Play apps as that account, and Google may
-                rate-limit, lock, or revoke accounts it sees on unofficial clients.
+                flag, rate-limit, lock, or restrict accounts it sees on unofficial clients.
+                Please continue at your own risk.
               </dd>
             </div>
             <div>
@@ -241,8 +272,23 @@ export default function Landing() {
           <a href={downloadUrl} className="whitespace-nowrap hover:text-foreground">
             Download app
           </a>
+          <a href="https://gplaydl.com" className="whitespace-nowrap hover:text-foreground">
+            APK downloader
+          </a>
+          <a
+            href="https://github.com/rehmatworks/gplaydl"
+            className="whitespace-nowrap hover:text-foreground"
+          >
+            CLI
+          </a>
           <a href="#selfhost" className="whitespace-nowrap hover:text-foreground">
             Self-hosting
+          </a>
+          <a
+            href="https://github.com/rehmatworks/gplaydl-dispenser"
+            className="whitespace-nowrap hover:text-foreground"
+          >
+            Source
           </a>
           <a href="#terms" className="whitespace-nowrap hover:text-foreground">
             Terms

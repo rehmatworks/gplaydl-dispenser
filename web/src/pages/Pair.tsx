@@ -62,6 +62,13 @@ export default function Pair() {
             </p>
           </CardHeader>
           <CardContent className="p-6 pt-4">
+            <div
+              className="mb-5 rounded-xl border border-chart-4/30 bg-chart-4/8 p-3 text-sm leading-relaxed text-muted-foreground"
+              role="note"
+            >
+              Google may flag or restrict accounts used with unofficial clients. Please use
+              a separate account and continue at your own risk.
+            </div>
             <form onSubmit={submit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="code">Pairing code</Label>

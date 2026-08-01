@@ -7,21 +7,31 @@ their own Google accounts through the Android app, and the service mints Google 
 session tokens from those accounts for that user's own [gplaydl](https://github.com/rehmatworks/gplaydl).
 Accounts are private to whoever added them; there is no shared pool.
 
+Use it with the [gplaydl command-line app](https://github.com/rehmatworks/gplaydl)
+or [gplaydl web](https://gplaydl.com) ([source](https://github.com/rehmatworks/gplaydl-web)).
+Google accounts are added through
+[gplaydl Authenticator](https://dispenser.gplaydl.com)
+([source](https://github.com/rehmatworks/gplaydl-authenticator)).
+
+> **Important:** This project uses unofficial Google Play access. Google may
+> flag, lock, or restrict accounts used with it. Please use a separate account
+> and continue at your own risk.
+
 ## Features
 
-- **App-managed private accounts** — users add Google accounts in the Android app.
+- **App-managed private accounts:** users add Google accounts in the Android app.
   Every account is private to its owner and never handed to anyone else.
-- **Atomic LRU rotation in Postgres** — a user's accounts are claimed with
+- **Atomic LRU rotation in Postgres:** a user's accounts are claimed with
   `FOR UPDATE SKIP LOCKED`, so concurrent requests rotate through distinct accounts
   without contention. Rotation state survives restarts and works across replicas.
-- **Encrypted at rest** — AAS tokens are sealed with AES-256-GCM before storage.
-- **Self-healing** — accounts are auto-flagged after 5 consecutive failures and drop
+- **Encrypted at rest:** AAS tokens are sealed with AES-256-GCM before storage.
+- **Self-healing:** accounts are auto-flagged after 5 consecutive failures and drop
   out of rotation; a successful mint reactivates them.
-- **Concurrent minting** — bounded parallel handshakes, per-mint timeouts, and
+- **Concurrent minting:** bounded parallel handshakes, per-mint timeouts, and
   automatic failover to the caller's next account.
-- **Built-in web app** — a passwordless, phone-paired dashboard embedded in the
+- **Built-in web app:** a passwordless, phone-paired dashboard embedded in the
   single Go binary for account health and management.
-- **Rate limiting** — unauthenticated requests are limited per IP; linked API-key
+- **Rate limiting:** unauthenticated requests are limited per IP; linked API-key
   users are exempt.
 
 ## API
@@ -37,10 +47,10 @@ Every dispense requires a linked API key; there is no anonymous minting.
 
 Query params for `/api/auth`:
 
-- `locale` — locale for the bundle (default `en`)
-- `device` — device profile name from `resources/` (GET only, default `arm64_xxhdpi`)
-- `email` — pick a specific one of your accounts when you added several
-- `full` — return the whole `AuthBundle` rather than `{email, auth}` (GET only)
+- `locale`: locale for the bundle (default `en`)
+- `device`: device profile name from `resources/` (GET only, default `arm64_xxhdpi`)
+- `email`: pick a specific one of your accounts when you added several
+- `full`: return the whole `AuthBundle` rather than `{email, auth}` (GET only)
 
 Use `GET /api/auth?full=1` when the caller has no device profile of its own: the
 dispenser mints with a profile from `resources/` and hands back every field the
@@ -76,9 +86,9 @@ dashboard.
 
 ### Getting an AAS token
 
-Use the [Authenticator app](https://github.com/whyorean/Authenticator/releases) to
-generate an AAS token for a Google account. AAS tokens don't expire unless the account
-password changes.
+Use [gplaydl Authenticator](https://dispenser.gplaydl.com)
+([source](https://github.com/rehmatworks/gplaydl-authenticator)) to sign in and
+sync a Google account. AAS tokens do not expire unless the account password changes.
 
 ## Development
 
@@ -102,7 +112,7 @@ protoc --proto_path=proto --go_out=internal/pb --go_opt=paths=source_relative pr
 |---|---|---|
 | `DISPENSER_ADDR` | `:8080` | Listen address |
 | `DATABASE_URL` | local docker | Postgres connection string |
-| `DISPENSER_ENCRYPTION_KEY` | — (required) | 64 hex chars; AES-256 key for AAS tokens |
+| `DISPENSER_ENCRYPTION_KEY` | required | 64 hex chars; AES-256 key for AAS tokens |
 | `DISPENSER_DEV` | off | `1` allows session cookies over plain HTTP |
 | `MINT_CONCURRENCY` | `64` | Max simultaneous Google handshakes |
 | `MINT_TIMEOUT_SECONDS` | `90` | Per-mint deadline |
@@ -129,10 +139,10 @@ Deploy behind nginx/Caddy with TLS; the binary serves both the API and the web a
 ## Deployment
 
 Pushes to `main` build a static Linux binary (frontend embedded) and deploy it to a
-bare Ubuntu server over SSH — no Docker. See [`deploy/README.md`](deploy/README.md)
+bare Ubuntu server over SSH without Docker. See [`deploy/README.md`](deploy/README.md)
 for the one-time server setup (systemd unit, Caddy config, Postgres role, and the
 GitHub secrets the workflow expects).
 
 ## License
 
-GPL-3.0-only — derived from Aurora Dispenser by Aurora OSS.
+GPL-3.0-only. Derived from Aurora Dispenser by Aurora OSS.
