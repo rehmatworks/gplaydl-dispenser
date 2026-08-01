@@ -51,13 +51,21 @@ export default function Landing() {
           <a href="/" aria-label="gplaydl dispenser home">
             <Logo />
           </a>
-          <div className="flex items-center gap-3">
-            <a
-              href="https://gplaydl.com"
-              className="hidden text-sm text-muted-foreground hover:text-foreground sm:inline"
+          <div className="flex items-center gap-3 sm:gap-5">
+            <nav
+              className="hidden items-center gap-4 text-sm text-muted-foreground sm:flex"
+              aria-label="Get gplaydl"
             >
-              APK downloader
-            </a>
+              <a href="https://gplaydl.com" className="hover:text-foreground">
+                Web downloader
+              </a>
+              <a
+                href="https://github.com/rehmatworks/gplaydl"
+                className="hover:text-foreground"
+              >
+                CLI
+              </a>
+            </nav>
             <Button asChild variant="outline" size="sm" className="glass rounded-xl">
               <a href={dashboardHref}>
                 <Smartphone className="size-4" />
@@ -179,7 +187,7 @@ export default function Landing() {
             Download app
           </a>
           <a href="https://gplaydl.com" className="whitespace-nowrap hover:text-foreground">
-            APK downloader
+            Web downloader
           </a>
           <a
             href="https://github.com/rehmatworks/gplaydl"

@@ -23,12 +23,28 @@ export function PolicyLayout({ title, description, children }: PolicyLayoutProps
           <a href="/" aria-label="gplaydl dispenser home">
             <Logo />
           </a>
-          <Button asChild variant="outline" size="sm" className="glass rounded-xl">
-            <a href="/dashboard">
-              <Smartphone className="size-4" />
-              Dashboard
-            </a>
-          </Button>
+          <div className="flex items-center gap-3 sm:gap-5">
+            <nav
+              className="hidden items-center gap-4 text-sm text-muted-foreground sm:flex"
+              aria-label="Get gplaydl"
+            >
+              <a href="https://gplaydl.com" className="hover:text-foreground">
+                Web downloader
+              </a>
+              <a
+                href="https://github.com/rehmatworks/gplaydl"
+                className="hover:text-foreground"
+              >
+                CLI
+              </a>
+            </nav>
+            <Button asChild variant="outline" size="sm" className="glass rounded-xl">
+              <a href="/dashboard">
+                <Smartphone className="size-4" />
+                Dashboard
+              </a>
+            </Button>
+          </div>
         </div>
       </header>
 
